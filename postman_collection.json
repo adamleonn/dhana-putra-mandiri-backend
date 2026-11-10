@@ -1,0 +1,908 @@
+{
+  "info": {
+    "_postman_id": "dhana-putra-backend-collection",
+    "name": "CV Dhana Putra Mandiri - Complete ERP Test Suite",
+    "description": "Comprehensive automated integration & RBAC test suite for CV Dhana Putra Mandiri backend API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00. Health & Auth",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('System is healthy', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('healthy');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01. Master Data",
+      "item": [
+        {
+          "name": "List Products (Direktur)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_direktur}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/products/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "products",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "var data = pm.response.json();",
+                  "var results = data.results || data;",
+                  "pm.test('Products array returned', function () {",
+                  "    pm.expect(results.length).to.be.above(0);",
+                  "    pm.environment.set('product_id', results[0].id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Product (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sku\": \"MNK-TEST-1L\", \"name\": \"Minyak Goreng Test Botol 1L\", \"brand\": \"Bimoli\", \"package_size\": \"1L\", \"uom\": \"Karton\", \"base_unit\": \"Liter\", \"conversion_factor\": \"12.00\", \"current_stock\": \"50.00\", \"minimum_stock\": \"10.00\", \"moving_average_hpp\": \"165000.00\", \"selling_price\": \"190000.00\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/products/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "products",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Product created (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Chart of Accounts (Direktur)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_direktur}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/chart-of-accounts/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "chart-of-accounts",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02. Logistics & Inventory Workflow",
+      "item": [
+        {
+          "name": "Create Goods Receipt (Gudang/Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"supplier_name\": \"PT Salim Ivomas Pratama Tbk\", \"po_reference\": \"PO-TEST-001\", \"receipt_date\": \"2026-11-10\", \"transport_cost\": \"1000000.00\", \"unloading_cost\": \"200000.00\", \"notes\": \"Penerimaan armada test\", \"items\": [{\"product\": \"{{product_id}}\", \"qty_ordered\": \"100.00\", \"qty_actual\": \"100.00\", \"purchase_price\": \"212000.00\"}]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/goods-receipts/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "goods-receipts",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Goods Receipt created (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var data = pm.response.json();",
+                  "    pm.environment.set('goods_receipt_id', data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Goods Receipt (Gudang)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_gudang}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/goods-receipts/{{goods_receipt_id}}/confirm/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "goods-receipts",
+                "{{goods_receipt_id}}",
+                "confirm",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Goods Receipt confirmed (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.status).to.eql('confirmed');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Delivery / Surat Jalan (Sales)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_sales}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customer_name\": \"Toko Berkah Minyak Test\", \"delivery_date\": \"2026-11-10\", \"driver_name\": \"Slamet\", \"vehicle_number\": \"B 1234 XYZ\", \"sales_order_ref\": \"SO-TEST-001\", \"items\": [{\"product\": \"{{product_id}}\", \"qty\": \"20.00\", \"qty_delivered\": \"20.00\"}]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/deliveries/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "deliveries",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delivery created (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var data = pm.response.json();",
+                  "    pm.environment.set('delivery_id', data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Delivery Atomic (Gudang)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_gudang}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/deliveries/{{delivery_id}}/confirm/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "deliveries",
+                "{{delivery_id}}",
+                "confirm",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delivery confirmed (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.status).to.eql('confirmed');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "ABC Stock Classification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_direktur}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/products/abc-analysis/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "products",
+                "abc-analysis",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "var data = pm.response.json();",
+                  "pm.test('ABC analysis summary present', function () {",
+                  "    pm.expect(data).to.have.property('summary');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03. Finance & General Ledger",
+      "item": [
+        {
+          "name": "List Sales Invoices (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/sales-invoices/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "sales-invoices",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "var data = pm.response.json();",
+                  "var results = data.results || data;",
+                  "if (results.length > 0) {",
+                  "    pm.environment.set('invoice_id', results[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Customer Payment (Kasir)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_kasir}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"payment_type\": \"RECEIPT\", \"payment_category\": \"customer_payment\", \"payment_method\": \"BANK_BCA\", \"payment_date\": \"2026-11-10\", \"amount\": \"4000000.00\", \"payer_or_payee\": \"Toko Berkah Minyak Test\", \"sales_invoice\": \"{{invoice_id}}\", \"notes\": \"Pelunasan faktur via BCA\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/payments/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "payments",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payment recorded (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "General Ledger Records (Accounting)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_accounting}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/general-ledger/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "general-ledger",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04. Financial Reports & Analytics",
+      "item": [
+        {
+          "name": "Balance Sheet / Neraca (Stakeholder)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_stakeholder}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/reports/balance-sheet/?as_of_date=2026-11-10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "reports",
+                "balance-sheet",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "as_of_date",
+                  "value": "2026-11-10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Balance Sheet returned (200)', function () { pm.response.to.have.status(200); });",
+                  "var data = pm.response.json();",
+                  "pm.test('Balance sheet is balanced', function () {",
+                  "    pm.expect(data.summary.is_balanced).to.be.true;",
+                  "    pm.expect(data.summary.difference).to.eql('0.00');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Annual Financial Report (Stakeholder)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_stakeholder}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/reports/annual-report/?year=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "reports",
+                "annual-report",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sales Trends 12 Months (Stakeholder)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_stakeholder}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/reports/sales-trends/?year=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "reports",
+                "sales-trends",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "var data = pm.response.json();",
+                  "pm.test('Trends have monthly data', function () {",
+                  "    pm.expect(data.monthly_trends.length).to.eql(12);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Brand Distribution Pie Chart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_stakeholder}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/reports/brand-distribution/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "reports",
+                "brand-distribution",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05. HR & Payroll",
+      "item": [
+        {
+          "name": "List Employees (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/hr/employees/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "hr",
+                "employees",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Monthly Payroll (Direktur)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_direktur}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"period_name\": \"November 2026\", \"auto_post_journal\": true}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/hr/payrolls/generate_monthly/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "hr",
+                "payrolls",
+                "generate_monthly",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payroll generated (200 or 201)', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06. RBAC Security Negative Tests",
+      "item": [
+        {
+          "name": "Gudang Accessing Products (Check HPP Hidden)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_gudang}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/products/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "products",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "var data = pm.response.json();",
+                  "var results = data.results || data;",
+                  "pm.test('HPP and price fields stripped for Gudang', function () {",
+                  "    pm.expect(results[0].moving_average_hpp).to.be.undefined;",
+                  "    pm.expect(results[0].selling_price).to.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sales Attempt Delivery Confirmation (Should be 403 Forbidden)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_sales}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/deliveries/{{delivery_id}}/confirm/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "deliveries",
+                "{{delivery_id}}",
+                "confirm",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sales denied delivery confirmation (403)', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accounting Attempt Period Close (Should be 403 Forbidden)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_accounting}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/accounting-periods/{{period_id}}/close_period/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "accounting-periods",
+                "{{period_id}}",
+                "close_period",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Non-Direktur denied period close (403)', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
