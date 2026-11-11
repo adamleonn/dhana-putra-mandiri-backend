@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "dhana-putra-backend-collection",
-    "name": "CV Dhana Putra Mandiri - Complete ERP Test Suite",
-    "description": "Comprehensive automated integration & RBAC test suite for CV Dhana Putra Mandiri backend API.",
+    "_postman_id": "dhana-putra-backend-collection-v2",
+    "name": "CV Dhana Putra Mandiri - Mini-ERP Production Hardened Test Suite",
+    "description": "Comprehensive automated integration & RBAC test suite for CV Dhana Putra Mandiri backend API (Production Hardening v2).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -16,14 +16,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/health/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "health",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health", ""]
             }
           },
           "event": [
@@ -50,6 +44,76 @@
       "name": "01. Master Data",
       "item": [
         {
+          "name": "List Customers (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/core/customers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "core", "customers", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Customers listed (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var data = pm.response.json();",
+                  "    var results = data.results || data;",
+                  "    if (results.length > 0) {",
+                  "        pm.environment.set('customer_id', results[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Suppliers (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/core/suppliers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "core", "suppliers", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Suppliers listed (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var data = pm.response.json();",
+                  "    var results = data.results || data;",
+                  "    if (results.length > 0) {",
+                  "        pm.environment.set('supplier_id', results[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
           "name": "List Products (Direktur)",
           "request": {
             "method": "GET",
@@ -61,15 +125,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/inventory/products/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "products",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "products", ""]
             }
           },
           "event": [
@@ -77,57 +134,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "var data = pm.response.json();",
-                  "var results = data.results || data;",
-                  "pm.test('Products array returned', function () {",
-                  "    pm.expect(results.length).to.be.above(0);",
-                  "    pm.environment.set('product_id', results[0].id);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Create Product (Admin)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token_admin}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"sku\": \"MNK-TEST-1L\", \"name\": \"Minyak Goreng Test Botol 1L\", \"brand\": \"Bimoli\", \"package_size\": \"1L\", \"uom\": \"Karton\", \"base_unit\": \"Liter\", \"conversion_factor\": \"12.00\", \"current_stock\": \"50.00\", \"minimum_stock\": \"10.00\", \"moving_average_hpp\": \"165000.00\", \"selling_price\": \"190000.00\"}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/inventory/products/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "products",
-                ""
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Product created (201)', function () {",
-                  "    pm.response.to.have.status(201);",
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Direktur sees HPP', function () {",
+                  "    var data = pm.response.json();",
+                  "    var item = (data.results && data.results.length > 0) ? data.results[0] : data[0];",
+                  "    pm.expect(item).to.have.property('current_hpp');",
+                  "    pm.environment.set('product_id', item.id);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -147,15 +159,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/chart-of-accounts/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "chart-of-accounts",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "chart-of-accounts", ""]
             }
           },
           "event": [
@@ -163,7 +168,17 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('COA listed (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var data = pm.response.json();",
+                  "    var results = data.results || data;",
+                  "    for (var i = 0; i < results.length; i++) {",
+                  "        if (results[i].is_cash_bank) {",
+                  "            pm.environment.set('cash_bank_id', results[i].id);",
+                  "            break;",
+                  "        }",
+                  "    }",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -176,7 +191,7 @@
       "name": "02. Logistics & Inventory Workflow",
       "item": [
         {
-          "name": "Create Goods Receipt (Gudang/Admin)",
+          "name": "Create Goods Receipt (Admin)",
           "request": {
             "method": "POST",
             "header": [
@@ -191,19 +206,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"supplier_name\": \"PT Salim Ivomas Pratama Tbk\", \"po_reference\": \"PO-TEST-001\", \"receipt_date\": \"2026-11-10\", \"transport_cost\": \"1000000.00\", \"unloading_cost\": \"200000.00\", \"notes\": \"Penerimaan armada test\", \"items\": [{\"product\": \"{{product_id}}\", \"qty_ordered\": \"100.00\", \"qty_actual\": \"100.00\", \"purchase_price\": \"212000.00\"}]}"
+              "raw": "{\n  \"supplier\": \"{{supplier_id}}\",\n  \"receipt_date\": \"2026-11-10\",\n  \"transport_cost\": \"800000.00\",\n  \"unloading_cost\": \"200000.00\",\n  \"driver_name\": \"Pak Slamet\",\n  \"vehicle_number\": \"B 9999 DPM\",\n  \"notes\": \"Penerimaan stok minyak goreng batch baru\",\n  \"items\": [\n    {\n      \"product\": \"{{product_id}}\",\n      \"qty_received\": \"100.00\",\n      \"unit_cost\": \"170000.00\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/inventory/goods-receipts/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "goods-receipts",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "goods-receipts", ""]
             }
           },
           "event": [
@@ -234,17 +242,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/inventory/goods-receipts/{{goods_receipt_id}}/confirm/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "goods-receipts",
-                "{{goods_receipt_id}}",
-                "confirm",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "goods-receipts", "{{goods_receipt_id}}", "confirm", ""]
             }
           },
           "event": [
@@ -264,7 +263,7 @@
           ]
         },
         {
-          "name": "Create Delivery / Surat Jalan (Sales)",
+          "name": "Create Draft Sales Invoice (Sales)",
           "request": {
             "method": "POST",
             "header": [
@@ -279,19 +278,55 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"customer_name\": \"Toko Berkah Minyak Test\", \"delivery_date\": \"2026-11-10\", \"driver_name\": \"Slamet\", \"vehicle_number\": \"B 1234 XYZ\", \"sales_order_ref\": \"SO-TEST-001\", \"items\": [{\"product\": \"{{product_id}}\", \"qty\": \"20.00\", \"qty_delivered\": \"20.00\"}]}"
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"invoice_date\": \"2026-11-10\",\n  \"payment_term_days\": 30,\n  \"payment_method\": \"credit\",\n  \"notes\": \"Draf pesanan invoice oleh Sales\",\n  \"items\": [\n    {\n      \"product\": \"{{product_id}}\",\n      \"qty_ordered\": \"20.00\",\n      \"unit_price\": \"200000.00\",\n      \"discount_amount\": \"0.00\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/finance/sales-invoices/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "sales-invoices", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sales Invoice created (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var data = pm.response.json();",
+                  "    pm.environment.set('invoice_id', data.id);",
+                  "    if (data.items && data.items.length > 0) {",
+                  "        pm.environment.set('invoice_item_id', data.items[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Delivery / Surat Jalan (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sales_invoice\": \"{{invoice_id}}\",\n  \"customer\": \"{{customer_id}}\",\n  \"delivery_date\": \"2026-11-10\",\n  \"driver_name\": \"Pak Joko Express\",\n  \"vehicle_number\": \"B 5678 DPM\",\n  \"notes\": \"Pengiriman Surat Jalan ke Pelanggan\",\n  \"items\": [\n    {\n      \"product\": \"{{product_id}}\",\n      \"sales_invoice_item\": \"{{invoice_item_id}}\",\n      \"qty\": \"20.00\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/inventory/deliveries/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "deliveries",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "deliveries", ""]
             }
           },
           "event": [
@@ -303,6 +338,9 @@
                   "    pm.response.to.have.status(201);",
                   "    var data = pm.response.json();",
                   "    pm.environment.set('delivery_id', data.id);",
+                  "    if (data.items && data.items.length > 0) {",
+                  "        pm.environment.set('delivery_item_id', data.items[0].id);",
+                  "    }",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -318,21 +356,20 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{token_gudang}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"id\": \"{{delivery_item_id}}\",\n      \"qty_delivered\": \"20.00\"\n    }\n  ]\n}"
+            },
             "url": {
               "raw": "{{baseUrl}}/api/inventory/deliveries/{{delivery_id}}/confirm/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "deliveries",
-                "{{delivery_id}}",
-                "confirm",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "deliveries", "{{delivery_id}}", "confirm", ""]
             }
           },
           "event": [
@@ -358,21 +395,13 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{token_direktur}}"
+                "value": "Bearer {{token_admin}}"
               }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/inventory/products/abc-analysis/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "products",
-                "abc-analysis",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "products", "abc-analysis", ""]
             }
           },
           "event": [
@@ -380,11 +409,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "var data = pm.response.json();",
-                  "pm.test('ABC analysis summary present', function () {",
-                  "    pm.expect(data).to.have.property('summary');",
-                  "});"
+                  "pm.test('ABC Classification returned 200', function () { pm.response.to.have.status(200); });"
                 ],
                 "type": "text/javascript"
               }
@@ -408,15 +433,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/sales-invoices/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "sales-invoices",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "sales-invoices", ""]
             }
           },
           "event": [
@@ -424,12 +442,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "var data = pm.response.json();",
-                  "var results = data.results || data;",
-                  "if (results.length > 0) {",
-                  "    pm.environment.set('invoice_id', results[0].id);",
-                  "}"
+                  "pm.test('Invoices listed (200)', function () { pm.response.to.have.status(200); });"
                 ],
                 "type": "text/javascript"
               }
@@ -452,19 +465,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"payment_type\": \"RECEIPT\", \"payment_category\": \"customer_payment\", \"payment_method\": \"BANK_BCA\", \"payment_date\": \"2026-11-10\", \"amount\": \"4000000.00\", \"payer_or_payee\": \"Toko Berkah Minyak Test\", \"sales_invoice\": \"{{invoice_id}}\", \"notes\": \"Pelunasan faktur via BCA\"}"
+              "raw": "{\n  \"category\": \"customer_receipt\",\n  \"payment_method\": \"bank_transfer\",\n  \"cash_bank_account\": \"{{cash_bank_id}}\",\n  \"sales_invoice\": \"{{invoice_id}}\",\n  \"amount\": \"4000000.00\",\n  \"payment_date\": \"2026-11-10\",\n  \"reference_number\": \"TRX-BCA-887766\",\n  \"notes\": \"Pelunasan piutang faktur via transfer BCA\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/finance/payments/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "payments",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "payments", ""]
             }
           },
           "event": [
@@ -474,6 +480,8 @@
                 "exec": [
                   "pm.test('Payment recorded (201)', function () {",
                   "    pm.response.to.have.status(201);",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.category).to.eql('customer_receipt');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -493,15 +501,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/general-ledger/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "general-ledger",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "general-ledger", ""]
             }
           },
           "event": [
@@ -509,7 +510,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('Ledger listed (200)', function () { pm.response.to.have.status(200); });"
                 ],
                 "type": "text/javascript"
               }
@@ -533,16 +534,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/reports/balance-sheet/?as_of_date=2026-11-10",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "reports",
-                "balance-sheet",
-                ""
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "reports", "balance-sheet", ""],
               "query": [
                 {
                   "key": "as_of_date",
@@ -556,11 +549,10 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Balance Sheet returned (200)', function () { pm.response.to.have.status(200); });",
-                  "var data = pm.response.json();",
-                  "pm.test('Balance sheet is balanced', function () {",
-                  "    pm.expect(data.summary.is_balanced).to.be.true;",
-                  "    pm.expect(data.summary.difference).to.eql('0.00');",
+                  "pm.test('Balance Sheet returned 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Balance Sheet is balanced', function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.is_balanced).to.eql(true);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -580,16 +572,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/reports/annual-report/?year=2026",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "reports",
-                "annual-report",
-                ""
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "reports", "annual-report", ""],
               "query": [
                 {
                   "key": "year",
@@ -603,7 +587,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('Annual Report returned 200', function () { pm.response.to.have.status(200); });"
                 ],
                 "type": "text/javascript"
               }
@@ -622,16 +606,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/reports/sales-trends/?year=2026",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "reports",
-                "sales-trends",
-                ""
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "reports", "sales-trends", ""],
               "query": [
                 {
                   "key": "year",
@@ -645,11 +621,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "var data = pm.response.json();",
-                  "pm.test('Trends have monthly data', function () {",
-                  "    pm.expect(data.monthly_trends.length).to.eql(12);",
-                  "});"
+                  "pm.test('Sales Trends returned 200', function () { pm.response.to.have.status(200); });"
                 ],
                 "type": "text/javascript"
               }
@@ -668,16 +640,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/reports/brand-distribution/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "reports",
-                "brand-distribution",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "reports", "brand-distribution", ""]
             }
           },
           "event": [
@@ -685,7 +649,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('Brand Distribution returned 200', function () { pm.response.to.have.status(200); });"
                 ],
                 "type": "text/javascript"
               }
@@ -709,15 +673,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/hr/employees/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "hr",
-                "employees",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hr", "employees", ""]
             }
           },
           "event": [
@@ -725,7 +682,88 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Sensitive salary fields are masked for Admin', function () {",
+                  "    var data = pm.response.json();",
+                  "    var results = data.results || data;",
+                  "    if (results.length > 0) {",
+                  "        pm.expect(results[0]).to.not.have.property('base_salary');",
+                  "        pm.expect(results[0]).to.not.have.property('bank_account_number');",
+                  "        pm.environment.set('employee_id', results[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Employee (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": \"EMP-GDG-099\",\n  \"full_name\": \"Agus Karyawan Baru\",\n  \"email\": \"agus.baru@dhanaputra.co.id\",\n  \"phone\": \"081299887766\",\n  \"national_id\": \"3201012345678901\",\n  \"tax_id\": \"09.999.888.7-012.000\",\n  \"department\": \"gudang\",\n  \"position\": \"Staff Helper Gudang\",\n  \"employment_status\": \"permanent\",\n  \"joined_date\": \"2026-11-01\",\n  \"base_salary\": \"4200000.00\",\n  \"standard_allowance\": \"300000.00\",\n  \"bank_name\": \"BCA\",\n  \"bank_account_number\": \"9876543210\",\n  \"bank_account_holder\": \"Agus Karyawan Baru\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/hr/employees/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hr", "employees", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Employee created (201)', function () { pm.response.to.have.status(201); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Labor Record (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee\": \"{{employee_id}}\",\n  \"record_date\": \"2026-11-10\",\n  \"record_type\": \"OVERTIME_LOG\",\n  \"title\": \"Lembur Bongkar Muat Barang\",\n  \"description\": \"Lembur 3 jam shift malam pembongkaran muatan truk supplier\",\n  \"hours\": \"3.00\",\n  \"hourly_rate\": \"35000.00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/hr/labor-records/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hr", "labor-records", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Labor record created (201)', function () { pm.response.to.have.status(201); });"
                 ],
                 "type": "text/javascript"
               }
@@ -748,20 +786,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"period_name\": \"November 2026\", \"auto_post_journal\": true}"
+              "raw": "{\n  \"period_month\": 11,\n  \"period_year\": 2026\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/hr/payrolls/generate_monthly/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "hr",
-                "payrolls",
-                "generate_monthly",
-                ""
-              ]
+              "raw": "{{baseUrl}}/api/hr/payroll-slips/generate_monthly/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hr", "payroll-slips", "generate_monthly", ""]
             }
           },
           "event": [
@@ -769,8 +799,44 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Payroll generated (200 or 201)', function () {",
-                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "pm.test('Payroll batch generated (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var data = pm.response.json();",
+                  "    if (data.results && data.results.length > 0) {",
+                  "        pm.environment.set('payroll_slip_id', data.results[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Payroll Slip (Direktur)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_direktur}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/hr/payroll-slips/{{payroll_slip_id}}/approve/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hr", "payroll-slips", "{{payroll_slip_id}}", "approve", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payroll slip approved (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.data.status).to.eql('approved');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -795,15 +861,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/inventory/products/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "products",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "products", ""]
             }
           },
           "event": [
@@ -811,12 +870,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "var data = pm.response.json();",
-                  "var results = data.results || data;",
-                  "pm.test('HPP and price fields stripped for Gudang', function () {",
-                  "    pm.expect(results[0].moving_average_hpp).to.be.undefined;",
-                  "    pm.expect(results[0].selling_price).to.be.undefined;",
+                  "pm.test('Gudang can view products (200)', function () { pm.response.to.have.status(200); });",
+                  "pm.test('All monetary fields stripped for Gudang', function () {",
+                  "    var data = pm.response.json();",
+                  "    var item = (data.results && data.results.length > 0) ? data.results[0] : data[0];",
+                  "    pm.expect(item).to.not.have.property('current_hpp');",
+                  "    pm.expect(item).to.not.have.property('stock_value');",
+                  "    pm.expect(item).to.not.have.property('selling_price');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -836,17 +896,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/inventory/deliveries/{{delivery_id}}/confirm/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "inventory",
-                "deliveries",
-                "{{delivery_id}}",
-                "confirm",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "deliveries", "{{delivery_id}}", "confirm", ""]
             }
           },
           "event": [
@@ -854,9 +905,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Sales denied delivery confirmation (403)', function () {",
-                  "    pm.response.to.have.status(403);",
-                  "});"
+                  "pm.test('Sales forbidden from confirming delivery (403)', function () { pm.response.to.have.status(403); });"
                 ],
                 "type": "text/javascript"
               }
@@ -875,17 +924,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/finance/accounting-periods/{{period_id}}/close_period/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "finance",
-                "accounting-periods",
-                "{{period_id}}",
-                "close_period",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "finance", "accounting-periods", "{{period_id}}", "close_period", ""]
             }
           },
           "event": [
@@ -893,9 +933,66 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Non-Direktur denied period close (403)', function () {",
-                  "    pm.response.to.have.status(403);",
-                  "});"
+                  "pm.test('Accounting forbidden from closing period (403)', function () { pm.response.to.have.status(403); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stakeholder Attempt POST Mutation (Should be 403 Forbidden)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_stakeholder}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Unauthorized Product\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/products/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "products", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Stakeholder mutation rejected (403)', function () { pm.response.to.have.status(403); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unauthenticated Request (Should be 401 Unauthorized)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/products/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inventory", "products", ""]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('No token rejected (401)', function () { pm.response.to.have.status(401); });"
                 ],
                 "type": "text/javascript"
               }

@@ -1,9 +1,12 @@
 from decimal import Decimal
 from rest_framework import serializers
-from config.permissions import is_direktur_or_superuser, user_in_group
-from core.models import Customer, Supplier
-from .models import (
+from core.mixins import RoleFilteredSerializerMixin
+from core.services.sequence import next_number
+from inventory.models import (
     Product,
+    ProductPriceTier,
+    PurchaseOrder,
+    PurchaseOrderItem,
     GoodsReceipt,
     GoodsReceiptItem,
     Delivery,
@@ -12,36 +15,15 @@ from .models import (
 )
 
 
-class RoleFilteredModelSerializer(serializers.ModelSerializer):
-    GUDANG_FORBIDDEN_FIELDS = set()
-    SALES_FORBIDDEN_FIELDS = set()
-
-    def get_fields(self):
-        fields = super().get_fields()
-        request = self.context.get('request')
-        if not request or not request.user or not request.user.is_authenticated:
-            return fields
-
-        if is_direktur_or_superuser(request.user):
-            return fields
-
-        if user_in_group(request.user, 'Gudang'):
-            for field_name in self.GUDANG_FORBIDDEN_FIELDS:
-                fields.pop(field_name, None)
-
-        if user_in_group(request.user, 'Sales'):
-            for field_name in self.SALES_FORBIDDEN_FIELDS:
-                fields.pop(field_name, None)
-
-        return fields
+class ProductPriceTierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductPriceTier
+        fields = ['id', 'product', 'min_qty', 'price', 'effective_from']
 
 
-class ProductSerializer(RoleFilteredModelSerializer):
-    estimated_stock_days = serializers.ReadOnlyField()
-    is_stock_below_28_days = serializers.ReadOnlyField()
-
-    GUDANG_FORBIDDEN_FIELDS = {'moving_average_hpp', 'selling_price'}
-    SALES_FORBIDDEN_FIELDS = {'moving_average_hpp'}
+class ProductSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
+    estimated_days_of_stock = serializers.ReadOnlyField()
+    price_tiers = ProductPriceTierSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -56,27 +38,86 @@ class ProductSerializer(RoleFilteredModelSerializer):
             'base_unit',
             'conversion_factor',
             'current_stock',
+            'stock_value',
             'moving_average_hpp',
             'selling_price',
+            'lead_time_days',
             'abc_class',
             'daily_consumption_rate',
             'min_stock_level',
-            'estimated_stock_days',
-            'is_stock_below_28_days',
+            'estimated_days_of_stock',
+            'price_tiers',
             'is_active',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['current_stock', 'moving_average_hpp', 'abc_class', 'created_at', 'updated_at']
+        read_only_fields = ['stock_value', 'moving_average_hpp', 'created_at', 'updated_at']
 
 
-class GoodsReceiptItemSerializer(RoleFilteredModelSerializer):
+class PurchaseOrderItemSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
+    product_sku = serializers.CharField(source='product.sku', read_only=True)
+    product_name = serializers.CharField(source='product.name', read_only=True)
+
+    class Meta:
+        model = PurchaseOrderItem
+        fields = [
+            'id',
+            'product',
+            'product_sku',
+            'product_name',
+            'qty_ordered',
+            'unit_price',
+            'line_total'
+        ]
+        read_only_fields = ['line_total']
+
+
+class PurchaseOrderSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
+    items = PurchaseOrderItemSerializer(many=True, required=False)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            'id',
+            'po_number',
+            'supplier',
+            'supplier_name',
+            'order_date',
+            'status',
+            'notes',
+            'items',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['po_number', 'status', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        items_data = self.context.get('request').data.get('items', [])
+        order_date = validated_data.get('order_date')
+        validated_data['po_number'] = next_number('PO', order_date)
+
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['created_by'] = request.user
+
+        po = PurchaseOrder.objects.create(**validated_data)
+        for item_data in items_data:
+            product = Product.objects.get(pk=item_data['product'])
+            PurchaseOrderItem.objects.create(
+                purchase_order=po,
+                product=product,
+                qty_ordered=Decimal(str(item_data['qty_ordered'])),
+                unit_price=Decimal(str(item_data.get('unit_price', product.moving_average_hpp)))
+            )
+        return po
+
+
+class GoodsReceiptItemSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     product_sku = serializers.CharField(source='product.sku', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_uom = serializers.CharField(source='product.uom', read_only=True)
     discrepancy_qty = serializers.ReadOnlyField()
-
-    GUDANG_FORBIDDEN_FIELDS = {'purchase_price', 'allocated_transport_cost', 'effective_unit_cost'}
 
     class Meta:
         model = GoodsReceiptItem
@@ -90,80 +131,108 @@ class GoodsReceiptItemSerializer(RoleFilteredModelSerializer):
             'qty_actual',
             'purchase_price',
             'allocated_transport_cost',
+            'allocated_unloading_cost',
             'effective_unit_cost',
+            'line_total',
             'discrepancy_qty',
             'notes',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['allocated_transport_cost', 'effective_unit_cost', 'created_at', 'updated_at']
+        read_only_fields = [
+            'allocated_transport_cost',
+            'allocated_unloading_cost',
+            'effective_unit_cost',
+            'line_total',
+            'created_at',
+            'updated_at'
+        ]
 
 
-class GoodsReceiptSerializer(RoleFilteredModelSerializer):
+class GoodsReceiptSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     items = GoodsReceiptItemSerializer(many=True, required=False)
     supplier_code = serializers.CharField(source='supplier.code', read_only=True)
-    received_by_name = serializers.CharField(source='received_by.get_full_name', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    net_payable = serializers.ReadOnlyField()
     has_quantity_discrepancy = serializers.ReadOnlyField()
-
-    GUDANG_FORBIDDEN_FIELDS = {'transport_cost', 'unloading_cost'}
 
     class Meta:
         model = GoodsReceipt
         fields = [
             'id',
             'receipt_number',
+            'purchase_order',
             'supplier',
             'supplier_code',
             'supplier_name',
-            'po_reference',
             'receipt_date',
+            'due_date',
+            'payment_method',
+            'payment_status',
             'transport_cost',
             'unloading_cost',
+            'payable_amount',
+            'debit_note_total',
+            'paid_amount',
+            'net_payable',
             'status',
             'notes',
-            'created_by',
-            'created_by_name',
-            'received_by',
-            'received_by_name',
-            'confirmed_at',
             'has_quantity_discrepancy',
+            'confirmed_at',
             'items',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['status', 'created_by', 'confirmed_at', 'received_by', 'created_at', 'updated_at']
+        read_only_fields = [
+            'receipt_number',
+            'status',
+            'payment_status',
+            'payable_amount',
+            'debit_note_total',
+            'paid_amount',
+            'confirmed_at',
+            'created_at',
+            'updated_at'
+        ]
 
     def create(self, validated_data):
-        from config.sequence_generator import generate_document_number
-        if not validated_data.get('receipt_number'):
-            validated_data['receipt_number'] = generate_document_number('GR', validated_data.get('receipt_date'))
-        if self.context.get('request') and self.context.get('request').user.is_authenticated:
-            validated_data['created_by'] = self.context.get('request').user
+        receipt_date = validated_data.get('receipt_date')
+        validated_data['receipt_number'] = next_number('GR', receipt_date)
+
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['created_by'] = request.user
+            validated_data['received_by'] = request.user
+
         items_data = self.context.get('request').data.get('items', [])
+        po = validated_data.get('purchase_order')
+
         receipt = GoodsReceipt.objects.create(**validated_data)
         for item_data in items_data:
             product = Product.objects.get(pk=item_data['product'])
+            qty_ordered = item_data.get('qty_ordered')
+            if po and not qty_ordered:
+                po_item = po.items.filter(product=product).first()
+                qty_ordered = po_item.qty_ordered if po_item else item_data['qty_actual']
+            elif not qty_ordered:
+                qty_ordered = item_data['qty_actual']
+
             GoodsReceiptItem.objects.create(
                 goods_receipt=receipt,
                 product=product,
-                qty_ordered=item_data['qty_ordered'],
-                qty_actual=item_data.get('qty_actual', item_data['qty_ordered']),
-                purchase_price=item_data.get('purchase_price', '0.00'),
+                qty_ordered=Decimal(str(qty_ordered)),
+                qty_actual=Decimal(str(item_data['qty_actual'])),
+                purchase_price=Decimal(str(item_data.get('purchase_price', '0.00'))),
                 notes=item_data.get('notes', '')
             )
         return receipt
 
 
-class DeliveryItemSerializer(RoleFilteredModelSerializer):
+class DeliveryItemSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     product_sku = serializers.CharField(source='product.sku', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_uom = serializers.CharField(source='product.uom', read_only=True)
     effective_qty = serializers.ReadOnlyField()
-    total_cogs = serializers.ReadOnlyField()
-
-    GUDANG_FORBIDDEN_FIELDS = {'hpp_at_delivery', 'total_cogs'}
-    SALES_FORBIDDEN_FIELDS = {'hpp_at_delivery', 'total_cogs'}
 
     class Meta:
         model = DeliveryItem
@@ -173,6 +242,7 @@ class DeliveryItemSerializer(RoleFilteredModelSerializer):
             'product_sku',
             'product_name',
             'product_uom',
+            'sales_invoice_item',
             'qty',
             'qty_delivered',
             'effective_qty',
@@ -181,66 +251,64 @@ class DeliveryItemSerializer(RoleFilteredModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['hpp_at_delivery', 'created_at', 'updated_at']
+        read_only_fields = ['hpp_at_delivery', 'total_cogs', 'created_at', 'updated_at']
 
 
-class DeliverySerializer(RoleFilteredModelSerializer):
+class DeliverySerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     items = DeliveryItemSerializer(many=True, required=False)
     customer_code = serializers.CharField(source='customer.code', read_only=True)
-    confirmed_by_name = serializers.CharField(source='confirmed_by.get_full_name', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    invoice_number = serializers.CharField(source='sales_invoice.invoice_number', read_only=True)
 
     class Meta:
         model = Delivery
         fields = [
             'id',
             'delivery_number',
+            'sales_invoice',
+            'invoice_number',
             'customer',
             'customer_code',
             'customer_name',
             'delivery_date',
             'driver_name',
             'vehicle_number',
-            'sales_order_ref',
             'status',
             'confirmed_at',
-            'created_by',
-            'created_by_name',
-            'confirmed_by',
-            'confirmed_by_name',
             'notes',
             'items',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['status', 'created_by', 'confirmed_at', 'confirmed_by', 'created_at', 'updated_at']
+        read_only_fields = ['delivery_number', 'status', 'confirmed_at', 'created_at', 'updated_at']
 
     def create(self, validated_data):
-        from config.sequence_generator import generate_document_number
-        if not validated_data.get('delivery_number'):
-            validated_data['delivery_number'] = generate_document_number('SJ', validated_data.get('delivery_date'))
-        if self.context.get('request') and self.context.get('request').user.is_authenticated:
-            validated_data['created_by'] = self.context.get('request').user
+        delivery_date = validated_data.get('delivery_date')
+        validated_data['delivery_number'] = next_number('SJ', delivery_date)
+
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['created_by'] = request.user
+
         items_data = self.context.get('request').data.get('items', [])
         delivery = Delivery.objects.create(**validated_data)
+
         for item_data in items_data:
             product = Product.objects.get(pk=item_data['product'])
+            inv_item_id = item_data.get('sales_invoice_item')
             DeliveryItem.objects.create(
                 delivery=delivery,
                 product=product,
-                qty=item_data['qty'],
-                qty_delivered=item_data.get('qty_delivered', Decimal('0.00'))
+                sales_invoice_item_id=inv_item_id,
+                qty=Decimal(str(item_data['qty'])),
+                qty_delivered=None
             )
         return delivery
 
 
-class StockMovementSerializer(serializers.ModelSerializer):
+class StockMovementSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     product_sku = serializers.CharField(source='product.sku', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
-    product_uom = serializers.CharField(source='product.uom', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    movement_type_display = serializers.CharField(source='get_movement_type_display', read_only=True)
-    reference_type_display = serializers.CharField(source='get_reference_type_display', read_only=True)
 
     class Meta:
         model = StockMovement
@@ -249,20 +317,19 @@ class StockMovementSerializer(serializers.ModelSerializer):
             'product',
             'product_sku',
             'product_name',
-            'product_uom',
             'movement_date',
             'movement_type',
-            'movement_type_display',
-            'reference_type',
-            'reference_type_display',
-            'reference_number',
             'qty',
             'unit_cost',
+            'total_cost',
             'stock_before',
             'stock_after',
-            'created_by',
-            'created_by_name',
+            'hpp_after',
+            'goods_receipt_item',
+            'delivery_item',
+            'reference_type',
+            'reference_id',
             'notes',
             'created_at',
         ]
-        read_only_fields = ['created_at']
+        read_only_fields = fields

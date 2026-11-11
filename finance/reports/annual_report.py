@@ -7,10 +7,6 @@ from .sales_reports import generate_sales_trends, generate_product_sales_report
 
 
 def generate_annual_report(year=None) -> Dict[str, Any]:
-    """
-    LAPORAN TAHUNAN (ANNUAL PERFORMANCE & FINANCIAL SUMMARY)
-    Menyajikan rangkuman performa fiskal 1 tahun penuh.
-    """
     if year is None:
         year = timezone.now().year
 
@@ -18,14 +14,14 @@ def generate_annual_report(year=None) -> Dict[str, Any]:
     product_report = generate_product_sales_report(year)
 
     gl_lines = GeneralLedgerLine.objects.filter(
-        ledger_entry__transaction_date__year=year,
+        ledger_entry__date__year=year,
         ledger_entry__is_posted=True
     )
 
-    unloading_expense = gl_lines.filter(account__code='6100').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
-    payroll_expense = gl_lines.filter(account__code='6200').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
-    transport_armada = gl_lines.filter(account__code='6300').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
-    general_expense = gl_lines.filter(account__code='6400').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
+    unloading_expense = gl_lines.filter(account__account_code='6120').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
+    payroll_expense = gl_lines.filter(account__account_code='6110').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
+    transport_armada = gl_lines.filter(account__account_code='6130').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
+    general_expense = gl_lines.filter(account__account_code='6100').aggregate(Sum('debit'))['debit__sum'] or Decimal('0.00')
 
     total_operating_expense = unloading_expense + payroll_expense + transport_armada + general_expense
     total_sales = product_report['total_revenue']
@@ -50,6 +46,5 @@ def generate_annual_report(year=None) -> Dict[str, Any]:
             'net_profit_margin_pct': round(float((net_operating_profit / total_sales * 100)), 2) if total_sales > 0 else 0.0,
         },
         'monthly_breakdown': monthly_trends,
-        'top_products': product_report['products'][:5]
+        'product_performance': product_report['products']
     }
-

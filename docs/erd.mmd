@@ -1,0 +1,169 @@
+```mermaid
+erDiagram
+  %% Core & Identity Relations
+  USER ||--o{ AUDIT_LOG : "performs (actor)"
+  USER ||--o| EMPLOYEE : "profile (user)"
+  USER ||--o{ PURCHASE_ORDER : "creates (created_by)"
+  USER ||--o{ GOODS_RECEIPT : "confirms (confirmed_by)"
+  USER ||--o{ DELIVERY : "confirms (confirmed_by)"
+  USER ||--o{ SALES_INVOICE : "creates (created_by)"
+  USER ||--o{ GENERAL_LEDGER : "posts (posted_by)"
+  USER ||--o{ PAYROLL_SLIP : "approves (approved_by)"
+
+  %% Customer & Supplier
+  CUSTOMER ||--o{ SALES_INVOICE : "billed (customer)"
+  CUSTOMER ||--o{ DELIVERY : "receives (customer)"
+  SUPPLIER ||--o{ PURCHASE_ORDER : "ordered from (supplier)"
+  SUPPLIER ||--o{ GOODS_RECEIPT : "supplies (supplier)"
+  SUPPLIER ||--o{ DEBIT_NOTE : "charged (supplier)"
+
+  %% Products & Catalog
+  PRODUCT ||--o{ PRODUCT_PRICE_TIER : "priced by"
+  PRODUCT ||--o{ PURCHASE_ORDER_ITEM : "ordered"
+  PRODUCT ||--o{ GOODS_RECEIPT_ITEM : "received"
+  PRODUCT ||--o{ SALES_INVOICE_ITEM : "billed"
+  PRODUCT ||--o{ DELIVERY_ITEM : "dispatched"
+  PRODUCT ||--o{ STOCK_MOVEMENT : "tracked"
+
+  %% Purchasing & Inbound Inventory
+  PURCHASE_ORDER ||--|{ PURCHASE_ORDER_ITEM : "has"
+  PURCHASE_ORDER ||--o{ GOODS_RECEIPT : "fulfilled by"
+  GOODS_RECEIPT ||--|{ GOODS_RECEIPT_ITEM : "has"
+  GOODS_RECEIPT ||--o{ DEBIT_NOTE : "discrepancy"
+  GOODS_RECEIPT ||--o{ PAYMENT : "settled by"
+  GOODS_RECEIPT_ITEM ||--o| STOCK_MOVEMENT : "creates IN"
+
+  %% Sales, Outbound Delivery & Inventory
+  SALES_INVOICE ||--|{ SALES_INVOICE_ITEM : "has"
+  SALES_INVOICE ||--o{ SALES_INVOICE_REVISION : "revised"
+  SALES_INVOICE ||--|| DELIVERY : "fulfilled by (Delivery.sales_invoice 1:1)"
+  SALES_INVOICE ||--o{ PAYMENT : "paid by"
+  DELIVERY ||--|{ DELIVERY_ITEM : "has"
+  SALES_INVOICE_ITEM ||--o| DELIVERY_ITEM : "delivered as"
+  DELIVERY_ITEM ||--o| STOCK_MOVEMENT : "creates OUT"
+
+  %% General Ledger & Cash/Bank
+  DEBIT_NOTE ||--o{ PAYMENT : "offsets"
+  CHART_OF_ACCOUNTS ||--o{ PAYMENT : "cash_bank_account"
+  CHART_OF_ACCOUNTS ||--o{ GENERAL_LEDGER_LINE : "posted to"
+  CHART_OF_ACCOUNTS ||--o| CHART_OF_ACCOUNTS : "parent"
+  ACCOUNTING_PERIOD ||--o{ GENERAL_LEDGER : "includes"
+  GENERAL_LEDGER ||--|{ GENERAL_LEDGER_LINE : "has lines"
+  GENERAL_LEDGER ||--o| GENERAL_LEDGER : "reversal_of"
+  GENERAL_LEDGER ||--o{ SALES_INVOICE : "journal"
+  GENERAL_LEDGER ||--o{ DEBIT_NOTE : "journal"
+  GENERAL_LEDGER ||--o{ PAYMENT : "journal / reversal"
+
+  %% Human Resources & Payroll
+  EMPLOYEE ||--o{ EMPLOYEE_MUTATION : "history"
+  EMPLOYEE ||--o{ LABOR_RECORD : "logs"
+  EMPLOYEE ||--o{ PAYROLL_SLIP : "receives"
+  PAYROLL_SLIP ||--o| PAYMENT : "paid by (category payroll)"
+  GENERAL_LEDGER ||--o{ PAYROLL_SLIP : "accrual journal"
+
+  %% Document Sequence Tracking
+  DOCUMENT_SEQUENCE_COUNTER {
+    string doc_type PK
+    string period_key PK
+    int last_number
+  }
+
+  USER {
+    int id PK
+    string username UK
+    string email
+    string oidc_issuer
+    string oidc_subject UK
+    boolean is_active
+  }
+
+  CUSTOMER {
+    int id PK
+    string code UK
+    string name
+    string tax_id
+    decimal credit_limit
+    int payment_term_days
+  }
+
+  SUPPLIER {
+    int id PK
+    string code UK
+    string name
+    string tax_id
+    int payment_term_days
+  }
+
+  PRODUCT {
+    int id PK
+    string sku UK
+    string name
+    string category
+    string brand
+    decimal physical_stock
+    decimal stock_value
+    decimal current_hpp
+    decimal selling_price
+    string abc_class
+  }
+
+  GOODS_RECEIPT {
+    int id PK
+    string receipt_number UK
+    int supplier_id FK
+    date receipt_date
+    decimal transport_cost
+    decimal unloading_cost
+    decimal total_amount
+    decimal payable_amount
+    decimal debit_note_total
+    decimal paid_amount
+    string status
+  }
+
+  SALES_INVOICE {
+    int id PK
+    string invoice_number UK
+    int customer_id FK
+    date invoice_date
+    date due_date
+    decimal total_amount
+    decimal paid_amount
+    string status
+  }
+
+  DELIVERY {
+    int id PK
+    string delivery_number UK
+    int sales_invoice_id FK "1:1"
+    int customer_id FK
+    date delivery_date
+    string driver_name
+    string vehicle_number
+    string status
+  }
+
+  GENERAL_LEDGER {
+    int id PK
+    string journal_number UK
+    int period_id FK
+    date transaction_date
+    string source_document
+    int reversal_of_id FK
+    boolean is_posted
+  }
+
+  PAYMENT {
+    int id PK
+    string payment_number UK
+    string payment_method
+    string category
+    string direction
+    int cash_bank_account_id FK
+    int sales_invoice_id FK
+    int goods_receipt_id FK
+    int payroll_slip_id FK
+    decimal amount
+    date payment_date
+  }
+```

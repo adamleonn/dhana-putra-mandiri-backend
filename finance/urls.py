@@ -1,5 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from core.views import CustomerViewSet, SupplierViewSet
 from .views import (
     ChartOfAccountsViewSet,
     AccountingPeriodViewSet,
@@ -8,8 +9,6 @@ from .views import (
     DebitNoteViewSet,
     PaymentViewSet,
     FinancialReportsViewSet,
-    CustomerViewSet,
-    SupplierViewSet,
 )
 
 router = DefaultRouter()

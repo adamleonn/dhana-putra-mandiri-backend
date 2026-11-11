@@ -1,115 +1,98 @@
 from decimal import Decimal
 from django.db import models
-from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
+from django.conf import settings
+from core.models import AuditedModel, TimeStampedModel
 
-User = get_user_model()
 
-
-class Employee(models.Model):
-    """
-    Human Resources Employee Master Data.
-    Tracks organizational role, compensation components, and bank details.
-    """
+class Employee(AuditedModel):
     DEPARTMENT_CHOICES = [
-        ('direksi', 'Direksi / Executive'),
-        ('sales', 'Sales & Marketing'),
-        ('gudang', 'Gudang (Warehouse) & Logistics'),
-        ('finance', 'Finance (Kasir)'),
-        ('accounting', 'Accounting & Pajak'),
-        ('general', 'Umum & Operasional'),
+        ('gudang', 'Gudang & Bongkar Muat'),
+        ('logistik', 'Logistik & Armada Pengiriman'),
+        ('sales', 'Sales & Pemasaran'),
+        ('finance', 'Keuangan & Kasir'),
+        ('accounting', 'Akuntansi & Perpajakan'),
+        ('operasional', 'Administrasi & Operasional'),
+        ('manajemen', 'Direksi & Manajemen'),
     ]
 
-    employee_id = models.CharField(
-        max_length=32,
-        unique=True,
-        db_index=True,
-        help_text="Unique Employee ID (e.g. EMP-001)"
-    )
+    STATUS_CHOICES = [
+        ('probation', 'Masa Percobaan (Probation)'),
+        ('permanent', 'Karyawan Tetap (PKWTT)'),
+        ('contract', 'Karyawan Kontrak (PKWT)'),
+        ('internship', 'Magang'),
+        ('terminated', 'Berhenti / Diberhentikan'),
+    ]
+
+    employee_id = models.CharField(max_length=32, unique=True, help_text="Nomor Induk Karyawan (NIK Internal)")
     user = models.OneToOneField(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name='employee_profile',
-        help_text="Optional linked Django system user for RBAC authorization"
+        help_text="Akun login sistem yang terhubung dengan data karyawan ini"
     )
-    full_name = models.CharField(max_length=255, db_index=True)
+    full_name = models.CharField(max_length=128)
     email = models.EmailField(blank=True, default='')
     phone = models.CharField(max_length=32, blank=True, default='')
+    national_id = models.CharField(max_length=32, blank=True, default='', help_text="Nomor Induk Kependudukan (KTP)")
+    tax_id = models.CharField(max_length=64, blank=True, default='', help_text="NPWP Pribadi")
 
     department = models.CharField(max_length=32, choices=DEPARTMENT_CHOICES, db_index=True)
-    position = models.CharField(max_length=100)
+    position = models.CharField(max_length=64)
+    employment_status = models.CharField(max_length=32, choices=STATUS_CHOICES, default='permanent', db_index=True)
+    joined_date = models.DateField()
+    termination_date = models.DateField(null=True, blank=True)
 
-    # Remuneration components
     base_salary = models.DecimalField(
         max_digits=15,
         decimal_places=2,
         default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Standard monthly basic salary"
+        help_text="Gaji pokok bulanan (IDR)"
     )
     standard_allowance = models.DecimalField(
         max_digits=15,
         decimal_places=2,
         default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Fixed recurring monthly allowances (transport, lunch, etc.)"
+        help_text="Tunjangan tetap bulanan (IDR)"
     )
 
-    # Banking details for disbursements
     bank_name = models.CharField(max_length=64, blank=True, default='')
     bank_account_number = models.CharField(max_length=64, blank=True, default='')
-    bank_account_holder = models.CharField(max_length=255, blank=True, default='')
+    bank_account_holder = models.CharField(max_length=128, blank=True, default='')
 
-    is_active = models.BooleanField(default=True)
-    joined_date = models.DateField()
+    bpjs_tk_number = models.CharField(max_length=64, blank=True, default='', help_text="Nomor BPJS Ketenagakerjaan")
+    bpjs_kes_number = models.CharField(max_length=64, blank=True, default='', help_text="Nomor BPJS Kesehatan")
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
-        ordering = ['full_name']
+        ordering = ['employee_id']
         verbose_name = 'Employee'
         verbose_name_plural = 'Employees'
 
     def __str__(self):
-        return f"{self.employee_id} - {self.full_name} ({self.get_department_display()})"
+        return f"{self.employee_id} - {self.full_name} ({self.department})"
 
 
-class PayrollSlip(models.Model):
-    """
-    Monthly employee payroll slip.
-    Generation triggers an automatic expense journal posting in the Finance app.
-    """
+class PayrollSlip(AuditedModel):
     STATUS_CHOICES = [
-        ('draft', 'Draft (Generated)'),
-        ('approved', 'Approved by Management'),
-        ('paid', 'Paid (Disbursed)'),
+        ('draft', 'Draft (Dihitung Sistem)'),
+        ('approved', 'Approved by Direktur (Jurnal Akrual Terbit)'),
+        ('paid', 'Paid (Kas/Bank Terpotong & Lunas)'),
+        ('cancelled', 'Cancelled'),
     ]
 
-    MONTH_CHOICES = [
-        (1, '01 - Januari'),
-        (2, '02 - Februari'),
-        (3, '03 - Maret'),
-        (4, '04 - April'),
-        (5, '05 - Mei'),
-        (6, '06 - Juni'),
-        (7, '07 - Juli'),
-        (8, '08 - Agustus'),
-        (9, '09 - September'),
-        (10, '10 - Oktober'),
-        (11, '11 - November'),
-        (12, '12 - Desember'),
-    ]
-
-    slip_number = models.CharField(max_length=64, unique=True, db_index=True)
+    slip_number = models.CharField(max_length=64, unique=True)
     employee = models.ForeignKey(
         Employee,
         on_delete=models.PROTECT,
         related_name='payroll_slips'
     )
-    period_month = models.PositiveSmallIntegerField(choices=MONTH_CHOICES)
+    period_month = models.PositiveSmallIntegerField()
     period_year = models.PositiveSmallIntegerField()
 
     base_salary = models.DecimalField(
@@ -121,59 +104,82 @@ class PayrollSlip(models.Model):
         max_digits=15,
         decimal_places=2,
         default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Overtime, performance bonus, and allowances"
+        validators=[MinValueValidator(Decimal('0.00'))]
     )
     deductions = models.DecimalField(
         max_digits=15,
         decimal_places=2,
         default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="BPJS, absences, loan deductions"
+        validators=[MinValueValidator(Decimal('0.00'))]
     )
     net_salary = models.DecimalField(
         max_digits=15,
         decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Take-home pay: (base_salary + allowances - deductions)"
+        validators=[MinValueValidator(Decimal('0.00'))]
     )
 
     payment_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default='draft', db_index=True)
 
-    journal_entry = models.ForeignKey(
+    accrual_journal_entry = models.ForeignKey(
         'finance.GeneralLedger',
         on_delete=models.PROTECT,
         null=True,
         blank=True,
+        related_name='accrued_payroll_slips',
+        help_text="Jurnal pengakuan beban gaji saat slip gaji di-approve: Dr Beban Gaji / Cr Hutang Gaji"
+    )
+    payment = models.ForeignKey(
+        'finance.Payment',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name='payroll_slips',
-        help_text="Automatic expense journal entry posted in finance"
+        help_text="Transaksi pencairan kas/bank saat gaji ditransfer: Dr Hutang Gaji / Cr Kas/Bank"
+    )
+
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='approved_payroll_slips'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    paid_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='paid_payroll_slips'
     )
     notes = models.TextField(blank=True, default='')
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-period_year', '-period_month', '-id']
         verbose_name = 'Payroll Slip'
         verbose_name_plural = 'Payroll Slips'
-        unique_together = ('employee', 'period_month', 'period_year')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['employee', 'period_month', 'period_year'],
+                name='unique_employee_payroll_period'
+            ),
+            models.CheckConstraint(
+                condition=models.Q(net_salary=models.F('base_salary') + models.F('allowances') - models.F('deductions')),
+                name='chk_payroll_net_salary_balanced'
+            )
+        ]
 
     def __str__(self):
-        return f"{self.slip_number} - {self.employee.full_name} ({self.period_month}/{self.period_year}) - Net: {self.net_salary}"
+        return f"{self.slip_number} - {self.employee.full_name} ({self.period_month}/{self.period_year}) [Rp {self.net_salary:,.2f}]"
 
 
-class EmployeeMutation(models.Model):
-    """
-    Riwayat mutasi, promosi jabatan, perpindahan departemen, dan penyesuaian gaji karyawan.
-    """
+class EmployeeMutation(AuditedModel):
     MUTATION_TYPES = [
-        ('PROMOTION', 'Promosi Jabatan'),
-        ('DEMOTION', 'Demosi Jabatan'),
-        ('DEPARTMENT_TRANSFER', 'Mutasi Departemen'),
-        ('SALARY_ADJUSTMENT', 'Penyesuaian / Kenaikan Gaji'),
-        ('STATUS_CHANGE', 'Perubahan Status Kerja'),
+        ('promotion', 'Promosi Jabatan'),
+        ('demotion', 'Demosi'),
+        ('transfer', 'Rotasi Divisi / Departemen'),
+        ('salary_adjustment', 'Penyesuaian Gaji Pokok'),
     ]
 
     employee = models.ForeignKey(
@@ -182,59 +188,43 @@ class EmployeeMutation(models.Model):
         related_name='mutations'
     )
     mutation_date = models.DateField()
+    effective_date = models.DateField()
     mutation_type = models.CharField(max_length=32, choices=MUTATION_TYPES, db_index=True)
 
-    previous_department = models.CharField(max_length=64, blank=True, default='')
-    new_department = models.CharField(max_length=64, blank=True, default='')
+    previous_department = models.CharField(max_length=32, choices=Employee.DEPARTMENT_CHOICES)
+    new_department = models.CharField(max_length=32, choices=Employee.DEPARTMENT_CHOICES)
 
-    previous_position = models.CharField(max_length=100, blank=True, default='')
-    new_position = models.CharField(max_length=100, blank=True, default='')
+    previous_position = models.CharField(max_length=64)
+    new_position = models.CharField(max_length=64)
 
-    previous_salary = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        help_text="Gaji pokok sebelumnya"
-    )
-    new_salary = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        help_text="Gaji pokok baru setelah mutasi/penyesuaian"
-    )
+    previous_salary = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    new_salary = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
 
-    reason = models.TextField(help_text="Alasan atau SK mutasi / kenaikan jabatan")
+    reason = models.TextField()
     approved_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name='approved_mutations'
     )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_applied = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-mutation_date', '-id']
-        verbose_name = 'Mutasi Karyawan'
-        verbose_name_plural = 'Daftar Mutasi Karyawan'
+        verbose_name = 'Employee Mutation'
+        verbose_name_plural = 'Employee Mutations'
 
     def __str__(self):
-        return f"Mutasi {self.employee.full_name} [{self.get_mutation_type_display()}] - {self.mutation_date}"
+        return f"Mutasi {self.employee.full_name} ({self.mutation_type}) - TMT: {self.effective_date}"
 
 
-class LaborRecord(models.Model):
-    """
-    Catatan Tenaga Kerja (Log harian, absensi/lembur, surat peringatan, penghargaan, insiden gudang).
-    """
+class LaborRecord(TimeStampedModel):
     RECORD_TYPES = [
-        ('ATTENDANCE_NOTE', 'Catatan Kehadiran / Izin'),
-        ('OVERTIME_LOG', 'Catatan Lembur'),
-        ('INCIDENT', 'Insiden Kerja / Kelalaian Gudang'),
+        ('ATTENDANCE_NOTE', 'Catatan Kehadiran & Absensi'),
+        ('OVERTIME_LOG', 'Log Lembur Bongkar Muat / Armada'),
         ('WARNING_LETTER', 'Surat Peringatan (SP)'),
-        ('COMMENDATION', 'Apresiasi / Prestasi Kerja'),
-        ('GENERAL', 'Catatan Umum Kinerja'),
+        ('INCIDENT', 'Catatan Insiden Lapangan / Gudang'),
     ]
 
     employee = models.ForeignKey(
@@ -244,31 +234,32 @@ class LaborRecord(models.Model):
     )
     record_date = models.DateField(db_index=True)
     record_type = models.CharField(max_length=32, choices=RECORD_TYPES, db_index=True)
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=128)
     description = models.TextField()
-
     hours = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal('0.00'),
-        help_text="Jumlah jam jika berkaitan dengan lembur atau izin"
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Jumlah jam lembur / kerja lapangan"
     )
-
+    hourly_rate = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Tarif per jam upah lembur kuli / staf"
+    )
     recorded_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        null=True,
-        blank=True,
         related_name='recorded_labor_logs'
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
     class Meta:
         ordering = ['-record_date', '-id']
-        verbose_name = 'Catatan Tenaga Kerja'
-        verbose_name_plural = 'Catatan Tenaga Kerja'
+        verbose_name = 'Labor Record'
+        verbose_name_plural = 'Labor Records'
 
     def __str__(self):
-        return f"{self.employee.full_name} [{self.get_record_type_display()}] - {self.title}"
+        return f"[{self.record_type}] {self.employee.full_name} ({self.record_date}): {self.title}"

@@ -1,53 +1,19 @@
 from decimal import Decimal
 from rest_framework import serializers
-from config.permissions import is_direktur_or_superuser, user_in_group
-from core.models import Customer, Supplier
-from .models import (
+from core.mixins import RoleFilteredSerializerMixin
+from core.services.sequence import next_number
+from inventory.models import Product, ProductPriceTier
+from finance.models import (
     ChartOfAccounts,
     AccountingPeriod,
     GeneralLedger,
     GeneralLedgerLine,
     SalesInvoice,
     SalesInvoiceItem,
+    SalesInvoiceRevision,
     DebitNote,
     Payment
 )
-from inventory.models import Product
-
-
-class CustomerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Customer
-        fields = [
-            'id',
-            'code',
-            'name',
-            'contact_person',
-            'phone',
-            'email',
-            'address',
-            'credit_limit',
-            'is_active',
-            'created_at',
-            'updated_at',
-        ]
-
-
-class SupplierSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Supplier
-        fields = [
-            'id',
-            'code',
-            'name',
-            'contact_person',
-            'phone',
-            'email',
-            'address',
-            'is_active',
-            'created_at',
-            'updated_at',
-        ]
 
 
 class ChartOfAccountsSerializer(serializers.ModelSerializer):
@@ -55,20 +21,25 @@ class ChartOfAccountsSerializer(serializers.ModelSerializer):
         model = ChartOfAccounts
         fields = [
             'id',
-            'code',
+            'account_code',
             'name',
             'account_type',
+            'parent',
+            'report_group',
+            'normal_balance',
+            'is_cash_bank',
+            'is_postable',
             'is_active',
-            'description',
             'created_at',
             'updated_at',
         ]
 
 
 class AccountingPeriodSerializer(serializers.ModelSerializer):
+    is_closed = serializers.BooleanField(read_only=True)
     closed_by_name = serializers.CharField(source='closed_by.get_full_name', read_only=True)
     reopened_by_name = serializers.CharField(source='reopened_by.get_full_name', read_only=True)
-    is_closed = serializers.ReadOnlyField()
+    submitted_by_name = serializers.CharField(source='submitted_by.get_full_name', read_only=True)
 
     class Meta:
         model = AccountingPeriod
@@ -79,21 +50,29 @@ class AccountingPeriodSerializer(serializers.ModelSerializer):
             'end_date',
             'status',
             'is_closed',
+            'submitted_by',
+            'submitted_by_name',
+            'submitted_at',
             'closed_by',
             'closed_by_name',
             'closed_at',
             'reopened_by',
             'reopened_by_name',
             'reopened_at',
+            'closing_notes',
             'reopen_reason',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['status', 'closed_by', 'closed_at', 'reopened_by', 'reopened_at', 'created_at', 'updated_at']
+        read_only_fields = [
+            'status', 'is_closed', 'submitted_by', 'submitted_at',
+            'closed_by', 'closed_at', 'reopened_by', 'reopened_at',
+            'created_at', 'updated_at'
+        ]
 
 
-class GeneralLedgerLineSerializer(serializers.ModelSerializer):
-    account_code = serializers.CharField(source='account.code', read_only=True)
+class GeneralLedgerLineSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
+    account_code = serializers.CharField(source='account.account_code', read_only=True)
     account_name = serializers.CharField(source='account.name', read_only=True)
 
     class Meta:
@@ -106,47 +85,40 @@ class GeneralLedgerLineSerializer(serializers.ModelSerializer):
             'debit',
             'credit',
             'memo',
-            'created_at',
-            'updated_at',
         ]
 
 
-class GeneralLedgerSerializer(serializers.ModelSerializer):
+class GeneralLedgerSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     lines = GeneralLedgerLineSerializer(many=True, read_only=True)
+    period_name = serializers.CharField(source='period.period_name', read_only=True)
     posted_by_name = serializers.CharField(source='posted_by.get_full_name', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    total_debit = serializers.ReadOnlyField()
-    total_credit = serializers.ReadOnlyField()
-    is_balanced = serializers.ReadOnlyField()
 
     class Meta:
         model = GeneralLedger
         fields = [
             'id',
-            'entry_number',
-            'transaction_date',
+            'transaction_number',
             'period',
+            'period_name',
+            'date',
             'reference_type',
             'reference_id',
             'description',
             'is_posted',
-            'created_by',
-            'created_by_name',
+            'reversal_of',
             'posted_by',
             'posted_by_name',
-            'total_debit',
-            'total_credit',
-            'is_balanced',
             'lines',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['entry_number', 'is_posted', 'created_by', 'posted_by', 'created_at', 'updated_at']
+        read_only_fields = fields
 
 
-class SalesInvoiceItemSerializer(serializers.ModelSerializer):
+class SalesInvoiceItemSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     product_sku = serializers.CharField(source='product.sku', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
+    effective_billed_qty = serializers.ReadOnlyField()
 
     class Meta:
         model = SalesInvoiceItem
@@ -157,94 +129,150 @@ class SalesInvoiceItemSerializer(serializers.ModelSerializer):
             'product_name',
             'qty_ordered',
             'qty_delivered',
-            'qty',
+            'effective_billed_qty',
             'unit_price',
             'discount_amount',
             'line_total',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['line_total', 'created_at', 'updated_at']
+        read_only_fields = ['qty_delivered', 'line_total', 'created_at', 'updated_at']
 
 
-class SalesInvoiceSerializer(serializers.ModelSerializer):
+class SalesInvoiceRevisionSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
+    revised_by_name = serializers.CharField(source='revised_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = SalesInvoiceRevision
+        fields = [
+            'id',
+            'invoice',
+            'revision_number',
+            'old_total',
+            'new_total',
+            'reason',
+            'revised_by',
+            'revised_by_name',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+
+class SalesInvoiceSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
     items = SalesInvoiceItemSerializer(many=True, required=False)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    revisions = SalesInvoiceRevisionSerializer(many=True, read_only=True)
     customer_code = serializers.CharField(source='customer.code', read_only=True)
-    remaining_balance = serializers.ReadOnlyField()
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    remaining_due = serializers.ReadOnlyField()
 
     class Meta:
         model = SalesInvoice
         fields = [
             'id',
             'invoice_number',
-            'delivery',
             'customer',
             'customer_code',
             'customer_name',
             'invoice_date',
             'due_date',
+            'payment_method',
             'subtotal',
             'discount_amount',
             'total_amount',
             'paid_amount',
-            'remaining_balance',
+            'remaining_due',
             'status',
-            'created_by',
-            'created_by_name',
+            'revision_no',
             'notes',
+            'journal_entry',
             'items',
+            'revisions',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['paid_amount', 'created_by', 'created_at', 'updated_at']
+        read_only_fields = [
+            'invoice_number',
+            'subtotal',
+            'total_amount',
+            'paid_amount',
+            'status',
+            'revision_no',
+            'journal_entry',
+            'created_at',
+            'updated_at'
+        ]
 
     def create(self, validated_data):
-        from config.sequence_generator import generate_document_number
-        if not validated_data.get('invoice_number'):
-            validated_data['invoice_number'] = generate_document_number('INV', validated_data.get('invoice_date'))
+        invoice_date = validated_data.get('invoice_date')
+        validated_data['invoice_number'] = next_number('INV', invoice_date)
+
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['created_by'] = request.user
 
         items_data = self.context.get('request').data.get('items', [])
         subtotal = Decimal('0.00')
-        lines_to_create = []
 
+        # Calculate initial subtotal
         for item_data in items_data:
             product = Product.objects.get(pk=item_data['product'])
-            qty_ordered = Decimal(str(item_data.get('qty_ordered', item_data.get('qty', '0.00'))))
-            qty_delivered = Decimal(str(item_data.get('qty_delivered', qty_ordered)))
-            qty = qty_delivered
-            unit_price = Decimal(str(item_data.get('unit_price', product.selling_price)))
-            line_disc = Decimal(str(item_data.get('discount_amount', '0.00')))
-            line_total = (qty * unit_price) - line_disc
-            subtotal += line_total
-            lines_to_create.append({
-                'product': product,
-                'qty_ordered': qty_ordered,
-                'qty_delivered': qty_delivered,
-                'qty': qty,
-                'unit_price': unit_price,
-                'discount_amount': line_disc,
-                'line_total': line_total
-            })
+            qty_ordered = Decimal(str(item_data['qty_ordered']))
+            unit_price = item_data.get('unit_price')
+            if not unit_price:
+                tier = ProductPriceTier.objects.filter(
+                    product=product,
+                    min_qty__lte=qty_ordered,
+                    effective_from__lte=invoice_date
+                ).order_by('-min_qty').first()
+                unit_price = tier.price if tier else product.selling_price
+            else:
+                unit_price = Decimal(str(unit_price))
+
+            disc = Decimal(str(item_data.get('discount_amount', '0.00')))
+            line_tot = max(Decimal('0.00'), (qty_ordered * unit_price) - disc)
+            subtotal += line_tot
 
         discount_amount = validated_data.get('discount_amount', Decimal('0.00'))
         validated_data['subtotal'] = subtotal
         validated_data['total_amount'] = max(Decimal('0.00'), subtotal - discount_amount)
-        if self.context.get('request') and self.context.get('request').user.is_authenticated:
-            validated_data['created_by'] = self.context.get('request').user
+        validated_data['status'] = 'draft'
 
         invoice = SalesInvoice.objects.create(**validated_data)
-        for line in lines_to_create:
-            SalesInvoiceItem.objects.create(invoice=invoice, **line)
+
+        for item_data in items_data:
+            product = Product.objects.get(pk=item_data['product'])
+            qty_ordered = Decimal(str(item_data['qty_ordered']))
+            unit_price = item_data.get('unit_price')
+            if not unit_price:
+                tier = ProductPriceTier.objects.filter(
+                    product=product,
+                    min_qty__lte=qty_ordered,
+                    effective_from__lte=invoice_date
+                ).order_by('-min_qty').first()
+                unit_price = tier.price if tier else product.selling_price
+            else:
+                unit_price = Decimal(str(unit_price))
+
+            disc = Decimal(str(item_data.get('discount_amount', '0.00')))
+            line_tot = max(Decimal('0.00'), (qty_ordered * unit_price) - disc)
+
+            SalesInvoiceItem.objects.create(
+                invoice=invoice,
+                product=product,
+                qty_ordered=qty_ordered,
+                qty_delivered=None,
+                unit_price=unit_price,
+                discount_amount=disc,
+                line_total=line_tot
+            )
 
         return invoice
 
 
-class DebitNoteSerializer(serializers.ModelSerializer):
+class DebitNoteSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    receipt_number = serializers.CharField(source='goods_receipt.receipt_number', read_only=True)
     issued_by_name = serializers.CharField(source='issued_by.get_full_name', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    supplier_code = serializers.CharField(source='supplier.code', read_only=True)
-    goods_receipt_number = serializers.CharField(source='goods_receipt.receipt_number', read_only=True)
 
     class Meta:
         model = DebitNote
@@ -252,68 +280,59 @@ class DebitNoteSerializer(serializers.ModelSerializer):
             'id',
             'debit_note_number',
             'goods_receipt',
-            'goods_receipt_number',
+            'receipt_number',
             'supplier',
-            'supplier_code',
             'supplier_name',
             'date',
             'amount',
             'reason',
             'status',
             'journal_entry',
-            'created_by',
-            'created_by_name',
+            'period',
             'issued_by',
             'issued_by_name',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['journal_entry', 'created_by', 'issued_by', 'created_at', 'updated_at']
+        read_only_fields = [
+            'debit_note_number',
+            'status',
+            'journal_entry',
+            'period',
+            'issued_by',
+            'created_at',
+            'updated_at'
+        ]
 
 
-class PaymentSerializer(serializers.ModelSerializer):
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    customer_name_display = serializers.CharField(source='customer.name', read_only=True)
-    supplier_name_display = serializers.CharField(source='supplier.name', read_only=True)
-    cash_bank_account_code = serializers.CharField(source='cash_bank_account.code', read_only=True)
-    cash_bank_account_name = serializers.CharField(source='cash_bank_account.name', read_only=True)
+class PaymentSerializer(RoleFilteredSerializerMixin, serializers.ModelSerializer):
+    cash_bank_name = serializers.CharField(source='cash_bank_account.name', read_only=True)
+    invoice_number = serializers.CharField(source='sales_invoice.invoice_number', read_only=True)
+    receipt_number = serializers.CharField(source='goods_receipt.receipt_number', read_only=True)
 
     class Meta:
         model = Payment
         fields = [
             'id',
             'payment_number',
-            'payment_type',
+            'payment_method',
             'category',
+            'direction',
             'cash_bank_account',
-            'cash_bank_account_code',
-            'cash_bank_account_name',
-            'customer',
-            'customer_name_display',
-            'supplier',
-            'supplier_name_display',
+            'cash_bank_name',
             'sales_invoice',
+            'invoice_number',
             'goods_receipt',
+            'receipt_number',
             'debit_note',
+            'payroll_slip',
             'amount',
             'payment_date',
             'reference_number',
             'status',
             'notes',
             'journal_entry',
-            'created_by',
-            'created_by_name',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['journal_entry', 'created_by', 'created_at', 'updated_at']
-
-    def create(self, validated_data):
-        from config.sequence_generator import generate_document_number
-        if not validated_data.get('payment_number'):
-            category = validated_data.get('category')
-            prefix = 'BKM' if category == 'customer_receipt' else 'BKK'
-            validated_data['payment_number'] = generate_document_number(prefix, validated_data.get('payment_date'))
-        if self.context.get('request') and self.context.get('request').user.is_authenticated:
-            validated_data['created_by'] = self.context.get('request').user
-        return super().create(validated_data)
+        read_only_fields = ['payment_number', 'direction', 'status', 'journal_entry', 'created_at', 'updated_at']

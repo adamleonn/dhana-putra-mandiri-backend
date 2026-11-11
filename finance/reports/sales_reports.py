@@ -6,27 +6,24 @@ from finance.models import SalesInvoice, SalesInvoiceItem
 
 
 def generate_product_sales_report(year=None) -> Dict[str, Any]:
-    """
-    LAPORAN PENJUALAN PER PRODUK & MARGIN LABA:
-    Menghitung volume penjualan, pendapatan kotor, HPP, laba kotor, dan % margin laba per SKU.
-    """
     if year is None:
         year = timezone.now().year
 
     items = SalesInvoiceItem.objects.filter(
         invoice__invoice_date__year=year,
-        invoice__status__in=['unpaid', 'partially_paid', 'paid']
+        invoice__status__in=['approved', 'partially_paid', 'paid']
     ).select_related('product')
 
     product_stats = {}
     for line in items:
         p = line.product
+        qty = line.effective_billed_qty
         if p.id not in product_stats:
             product_stats[p.id] = {
                 'sku': p.sku,
                 'name': p.name,
-                'brand': getattr(p, 'brand', 'Lainnya'),
-                'package_size': getattr(p, 'package_size', '2L'),
+                'brand': p.brand,
+                'package_size': p.package_size,
                 'uom': p.uom,
                 'current_stock': p.current_stock,
                 'moving_average_hpp': p.moving_average_hpp,
@@ -37,9 +34,9 @@ def generate_product_sales_report(year=None) -> Dict[str, Any]:
             }
 
         line_revenue = line.line_total
-        line_cogs = line.qty * p.moving_average_hpp
+        line_cogs = qty * p.moving_average_hpp
 
-        product_stats[p.id]['qty_sold'] += line.qty
+        product_stats[p.id]['qty_sold'] += qty
         product_stats[p.id]['revenue'] += line_revenue
         product_stats[p.id]['cogs'] += line_cogs
 
@@ -68,10 +65,6 @@ def generate_product_sales_report(year=None) -> Dict[str, Any]:
 
 
 def generate_sales_trends(year=None) -> List[Dict[str, Any]]:
-    """
-    GRAFIK TREN PENJUALAN BULANAN (12 Bulan):
-    Menyajikan time-series omset, volume karton, HPP, dan laba kotor per bulan.
-    """
     if year is None:
         year = timezone.now().year
 
@@ -85,16 +78,21 @@ def generate_sales_trends(year=None) -> List[Dict[str, Any]]:
         invoices = SalesInvoice.objects.filter(
             invoice_date__year=year,
             invoice_date__month=m,
-            status__in=['unpaid', 'partially_paid', 'paid']
+            status__in=['approved', 'partially_paid', 'paid']
         )
         total_sales = invoices.aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
 
         items = SalesInvoiceItem.objects.filter(
             invoice__in=invoices
         ).select_related('product')
-        total_qty = items.aggregate(Sum('qty'))['qty__sum'] or Decimal('0.00')
 
-        cogs = sum((item.qty * item.product.moving_average_hpp for item in items), Decimal('0.00'))
+        total_qty = Decimal('0.00')
+        cogs = Decimal('0.00')
+        for item in items:
+            q = item.effective_billed_qty
+            total_qty += q
+            cogs += (q * item.product.moving_average_hpp)
+
         gross_profit = total_sales - cogs
 
         trends.append({
@@ -108,4 +106,3 @@ def generate_sales_trends(year=None) -> List[Dict[str, Any]]:
         })
 
     return trends
-
