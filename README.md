@@ -69,10 +69,7 @@ API ini dirancang untuk melayani frontend modern yang terpisah (*decoupled* sepe
 | :--- | :--- | :--- |
 | `direktur` | **Direktur** | **SuperAdmin** (Akses penuh CRUD + Hak eksklusif tutup/buka periode akuntansi) |
 | `admin` | **Admin** | Gabungan transaksi Penjualan (Sales/Invoice) & Keuangan (Finance/Kasir) |
-| `sales` | **Sales** | Draf Faktur, Surat Jalan, Diskon. *Nilai HPP dan Buku Besar disembunyikan.* |
 | `gudang` | **Gudang** | Konfirmasi Surat Jalan & Penerimaan Barang. *Nilai moneter otomatis disembunyikan.* |
-| `kasir` | **Finance** | Mutasi Kas & Bank, pembayaran supplier. *Dilarang merubah stok fisik.* |
-| `accounting` | **Accounting** | Buku Besar, Nota Debit, revisi nilai faktur, pengajuan tutup buku. |
 | `stakeholder` | **Stakeholder** | **Read-Only Dashboard** untuk melihat seluruh laporan keuangan & analitik. |
 
 ---
@@ -83,11 +80,8 @@ API ini dirancang untuk melayani frontend modern yang terpisah (*decoupled* sepe
 | :--- | :--- | :--- | :--- | :--- |
 | **Direktur** | **Full CRUD**: Kontrol penuh data partner bisnis & konfigurasi sistem. | **Full CRUD**: Otorisasi penghapusan stok, penyesuaian opname khusus. | **Hak Eksklusif**: Menyetujui **Tutup / Buka Periode Akuntansi**, akses seluruh laporan keuangan. | **Otorisasi**: Menyetujui mutasi/promosi, otorisasi pencairan gaji bulanan. |
 | **Stakeholder** | **Read-Only**: Melihat daftar profil rekanan. | **Read-Only**: Melihat ketahanan stok & Pareto ABC. | **Read-Only Dashboard**: Memantau Neraca, Laba-Rugi, Tren Penjualan 12 Bulan, & Pie Chart. | **Read-Only**: Melihat struktur organisasi & total beban upah. |
-| **Accounting** | **Read**: Memvalidasi identitas legal supplier & pelanggan. | **Read**: Memantau HPP Moving Average, Kartu Stok, dan audit selisih kirim. | **Main Control**: Mengaudit Buku Besar (GL), menerbitkan **Nota Debit** (potong hutang supplier), revisi faktur. | **Audit**: Memeriksa jurnal otomatis atas beban gaji karyawan. |
 | **Admin** | **CRUD**: Menambah dan mengupdate data pelanggan & supplier baru. | **Read / Create**: Menyiapkan draf dokumen jalan & penerimaan. | **Operasional**: Membuat faktur penjualan, mencatat penerimaan/pembayaran rutin. | **Read / Update**: Mengelola biodata karyawan operasional. |
-| **Sales** | **Read**: Mengakses daftar pelanggan untuk penawaran. | **Restricted**: Melihat ketersediaan stok fisik. **HPP disembunyikan total** guna melindungi margin. | **Create Draft**: Membuat draf Faktur & diskon promo. Dilarang melihat Buku Besar. | Tidak ada akses. |
 | **Gudang** | **Read**: Alamat tujuan kirim & asal supplier. | **Main Control**: Konfirmasi fisik barang masuk (BPB) & keluar (Surat Jalan). **Harga/HPP disembunyikan total**. | Tidak ada akses finansial (semua nominal rupiah otomatis disaring oleh serializer). | **Input**: Mencatat log lembur harian kuli bongkar muat armada. |
-| **Kasir / Finance** | **Read**: Rekening bank supplier & plafon kredit pelanggan. | Tidak ada akses mengubah stok fisik. | **Main Control**: Memproses Bukti Kas Masuk (BKM) dan Bukti Kas Keluar (BKK). | **Eksekusi**: Mencairkan transfer gaji bersih karyawan setelah di-approve Direktur. |
 
 ---
 
@@ -95,19 +89,14 @@ API ini dirancang untuk melayani frontend modern yang terpisah (*decoupled* sepe
 
 Backend menyediakan fasilitas integrasi cepat untuk tim Frontend:
 
-### 1. Header Otentikasi Cepat (Demo Mode)
-Gunakan header HTTP Authorization standar:
+### 1. Autentikasi OAuth 2.0 / OpenID Connect
+API hanya menerima access token JWT dari Keycloak (token demo `demo-*` sudah dihapus):
 ```http
-Authorization: Bearer <TOKEN>
+Authorization: Bearer <ACCESS_TOKEN_KEYCLOAK>
 ```
-Token pengembangan bawaan:
-- `Bearer demo-direktur` -> Hak akses penuh SuperAdmin
-- `Bearer demo-admin` -> Hak akses tim Operasional Admin
-- `Bearer demo-sales` -> Hak akses tim Sales
-- `Bearer demo-gudang` -> Hak akses operasional Gudang
-- `Bearer demo-kasir` -> Hak akses Kasir / Keuangan
-- `Bearer demo-accounting` -> Hak akses pembukuan Accounting
-- `Bearer demo-stakeholder` -> Hak akses Read-Only Dashboard
+Frontend Next.js memakai Authorization Code Flow + PKCE dengan sesi cookie HttpOnly (BFF).
+Setup Keycloak lokal, environment variable, matriks akses per endpoint, dan migrasi
+pengguna: **[docs/oauth2-keycloak-setup.md](docs/oauth2-keycloak-setup.md)**.
 
 ### 2. Penanganan Error Standar
 - **HTTP 409 Conflict (Stok Kurang)**:
@@ -200,7 +189,7 @@ Akses Swagger UI di: [http://localhost:8000/api/schema/swagger-ui/](http://local
 ## Pengujian API Menggunakan Postman
 File Postman Collection dan Environment telah disertakan pada root repository:
 - `postman_collection.json`: Berisi skenario uji komprehensif (Master Data, Inbound BPB, Draf Faktur, Outbound SJ, Konfirmasi Fisik Gudang, Pembayaran Kasir, Buku Besar, Neraca, Payroll Dua Tahap, dan Uji Keamanan 403 Forbidden).
-- `postman_environment.json`: Variabel lingkungan `baseUrl` dan demo bearer token untuk ke-7 role.
+- `postman_environment.json`: Variabel lingkungan `baseUrl` dan demo bearer token untuk pengujian role.
 
 Anda dapat mengimpor kedua file tersebut ke Postman atau menjalankannya langsung melalui Newman CLI:
 ```bash

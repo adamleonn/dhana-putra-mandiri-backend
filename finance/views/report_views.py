@@ -2,7 +2,8 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from config.permissions import StrictRoleBasedAccess
+from core.permissions import DEFAULT_PERMISSIONS, MANAGEMENT
+from finance.reports.sales_reports import sales_by_brand_and_size
 from finance.reports import (
     generate_balance_sheet,
     generate_product_sales_report,
@@ -20,9 +21,10 @@ class FinancialReportsViewSet(viewsets.ViewSet):
     - 12-Month Sales Trends
     - Annual Financial Summary
     - Brand & Package Size Pie Chart Analytics
-    Accessible to Accounting, Finance, Admin, Direktur, and Stakeholders.
+    Akses: Direktur, Admin, Stakeholder (read-only). Gudang ditolak (403).
     """
-    permission_classes = [permissions.IsAuthenticated, StrictRoleBasedAccess]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': MANAGEMENT}
 
     @action(detail=False, methods=['get'], url_path='balance-sheet')
     def balance_sheet(self, request):
@@ -50,7 +52,7 @@ class FinancialReportsViewSet(viewsets.ViewSet):
         year = request.query_params.get('year')
         year_val = int(year) if year and year.isdigit() else timezone.now().year
         trends = generate_sales_trends(year_val)
-        return Response({'year': year_val, 'trends': trends}, status=status.HTTP_200_OK)
+        return Response({'year': year_val, 'trends': trends, 'sales_mix': sales_by_brand_and_size(year_val)})
 
     @action(detail=False, methods=['get'], url_path='annual-report')
     def annual_report(self, request):

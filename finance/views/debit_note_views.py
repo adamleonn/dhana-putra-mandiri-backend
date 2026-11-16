@@ -2,7 +2,7 @@ from decimal import Decimal
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
-from core.permissions import IsAccounting, IsDirektur, IsStakeholderReadOnly
+from core.permissions import DEFAULT_PERMISSIONS, MANAGEMENT, DIREKTUR_ONLY
 from finance.models import DebitNote
 from finance.serializers import DebitNoteSerializer
 from finance.services.debit_note_service import issue_supplier_debit_note
@@ -14,14 +14,11 @@ class DebitNoteViewSet(viewsets.ModelViewSet):
         'goods_receipt', 'supplier', 'journal_entry', 'period', 'created_by', 'issued_by'
     )
     serializer_class = DebitNoteSerializer
-    permission_classes = [permissions.IsAuthenticated, IsStakeholderReadOnly]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': MANAGEMENT, 'write': DIREKTUR_ONLY}
     filterset_fields = ['status', 'supplier', 'date']
     search_fields = ['debit_note_number', 'supplier__name', 'reason']
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsAccounting() | IsDirektur())]
-        return super().get_permissions()
 
     def create(self, request, *args, **kwargs):
         goods_receipt_id = request.data.get('goods_receipt')

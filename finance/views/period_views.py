@@ -2,7 +2,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from core.permissions import IsDirektur, IsAccounting, IsStakeholderReadOnly
+from core.permissions import DEFAULT_PERMISSIONS, MANAGEMENT, DIREKTUR_ONLY
 from finance.models import AccountingPeriod
 from finance.serializers import AccountingPeriodSerializer
 from core.services.audit import log_audit
@@ -11,11 +11,12 @@ from core.services.audit import log_audit
 class AccountingPeriodViewSet(viewsets.ModelViewSet):
     queryset = AccountingPeriod.objects.all().select_related('closed_by', 'reopened_by', 'submitted_by')
     serializer_class = AccountingPeriodSerializer
-    permission_classes = [permissions.IsAuthenticated, IsStakeholderReadOnly]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': MANAGEMENT, 'write': DIREKTUR_ONLY, 'close_period': DIREKTUR_ONLY, 'reopen_period': DIREKTUR_ONLY, 'submit_period': DIREKTUR_ONLY}
     filterset_fields = ['status']
     search_fields = ['period_name']
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated, IsDirektur])
+    @action(detail=True, methods=['post'])
     def close_period(self, request, pk=None):
         period = self.get_object()
         if period.status == 'CLOSED':
@@ -45,7 +46,7 @@ class AccountingPeriodViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated, IsDirektur])
+    @action(detail=True, methods=['post'])
     def reopen_period(self, request, pk=None):
         period = self.get_object()
         if period.status != 'CLOSED':
@@ -78,7 +79,7 @@ class AccountingPeriodViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated, IsAccounting | IsDirektur])
+    @action(detail=True, methods=['post'])
     def submit_period(self, request, pk=None):
         period = self.get_object()
         if period.status != 'OPEN':

@@ -3,7 +3,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
-from core.permissions import IsGudang, IsDirektur, IsSales, IsAdminOps, IsStakeholderReadOnly
+from core.permissions import DEFAULT_PERMISSIONS, READ_ALL, DIREKTUR_ADMIN, DIREKTUR, ADMIN, GUDANG
 from inventory.models import Delivery
 from inventory.serializers import DeliverySerializer
 from inventory.services.delivery_service import confirm_delivery_atomic
@@ -15,16 +15,11 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         'sales_invoice', 'customer', 'created_by', 'confirmed_by'
     ).prefetch_related('items__product', 'items__sales_invoice_item')
     serializer_class = DeliverySerializer
-    permission_classes = [permissions.IsAuthenticated, IsStakeholderReadOnly]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': READ_ALL, 'write': {DIREKTUR, ADMIN, GUDANG}, 'destroy': DIREKTUR_ADMIN, 'confirm': {DIREKTUR, GUDANG}}
     filterset_fields = ['status', 'customer', 'delivery_date']
     search_fields = ['delivery_number', 'customer__name', 'driver_name', 'vehicle_number']
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return [permissions.IsAuthenticated(), (IsSales() | IsAdminOps() | IsDirektur())]
-        if self.action == 'confirm':
-            return [permissions.IsAuthenticated(), (IsGudang() | IsDirektur())]
-        return super().get_permissions()
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):

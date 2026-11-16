@@ -1,11 +1,13 @@
 from rest_framework import serializers
 
+from core.roles import ADMIN, DIREKTUR, GUDANG, get_user_roles
+
 
 class RoleFilteredSerializerMixin:
     """
     Enforces strict Role-Based field masking at API representation layer:
     - Gudang: all monetary and cost fields are completely stripped from responses.
-    - Sales / Admin: HPP (Cost of Goods Sold), profit margin, and stock valuation fields are stripped.
+    - Admin: HPP (Cost of Goods Sold), profit margin, and stock valuation fields are stripped.
     """
 
     GUDANG_MONETARY_FIELDS = {
@@ -30,18 +32,14 @@ class RoleFilteredSerializerMixin:
         if not request or not request.user.is_authenticated:
             return ret
 
-        user = request.user
-        if user.is_superuser or user.groups.filter(name='Direktur').exists():
+        roles = get_user_roles(request.user)
+        if DIREKTUR in roles:
             return ret
 
-        is_gudang = user.groups.filter(name='Gudang').exists()
-        is_sales = user.groups.filter(name='Sales').exists()
-        is_admin = user.groups.filter(name='Admin').exists()
-
-        if is_gudang:
+        if GUDANG in roles or not roles:
             for field in self.GUDANG_MONETARY_FIELDS:
                 ret.pop(field, None)
-        elif is_sales or is_admin:
+        elif ADMIN in roles:
             for field in self.RESTRICTED_HPP_FIELDS:
                 ret.pop(field, None)
 

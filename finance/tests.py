@@ -41,7 +41,7 @@ class FinanceSecurityAndLogicTests(TestCase):
         self.accounting_group = Group.objects.create(name='Accounting')
         self.finance_group = Group.objects.create(name='Finance')
         self.gudang_group = Group.objects.create(name='Gudang')
-        self.sales_group = Group.objects.create(name='Sales')
+        self.sales_group = Group.objects.create(name='Admin')  # peran Sales dipensiunkan -> Admin
         self.stakeholder_group = Group.objects.create(name='Stakeholder')
 
         self.direktur = User.objects.create_user(username='dir_test', password='password123')
@@ -180,7 +180,7 @@ class FinanceSecurityAndLogicTests(TestCase):
         for field in ['selling_price', 'moving_average_hpp', 'stock_value']:
             self.assertNotIn(field, res_gudang.data, f"Field '{field}' leaked to Gudang role!")
 
-        # 2. Sales responses must not contain HPP
+        # 2. Admin (eks-Sales) responses must not contain HPP
         self.client.force_authenticate(user=self.sales_user)
         res_sales = self.client.get(f"/api/inventory/products/{self.product.id}/")
         self.assertEqual(res_sales.status_code, status.HTTP_200_OK)

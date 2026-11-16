@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from core.permissions import IsStakeholderReadOnly, IsDirektur, IsAdminOps
+from core.permissions import DEFAULT_PERMISSIONS, READ_ALL, DIREKTUR_ADMIN
 from inventory.models import Product
 from inventory.serializers import ProductSerializer
 
@@ -9,14 +9,11 @@ from inventory.serializers import ProductSerializer
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().prefetch_related('price_tiers')
     serializer_class = ProductSerializer
-    permission_classes = [permissions.IsAuthenticated, IsStakeholderReadOnly]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': READ_ALL, 'write': DIREKTUR_ADMIN, 'stock_estimation': READ_ALL}
     filterset_fields = ['is_active', 'abc_class', 'uom', 'brand']
     search_fields = ['sku', 'name', 'brand']
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsDirektur() | IsAdminOps())]
-        return super().get_permissions()
 
     @action(detail=False, methods=['get'], url_path='stock-estimation')
     def stock_estimation(self, request):

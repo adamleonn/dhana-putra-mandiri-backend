@@ -14,17 +14,18 @@ Gunakan header standar HTTP Authorization dengan Bearer Token:
 Authorization: Bearer <TOKEN>
 ```
 
-### 1.2 Mode Demo & Development
-Untuk kemudahan pengembangan dan prototyping di frontend Next.js, sistem mendukung token cepat tanpa harus login ke Keycloak/Auth0:
-- `Bearer demo-direktur` -> Login sebagai Direktur (SuperAdmin)
-- `Bearer demo-admin`    -> Login sebagai Admin (Penjualan & Keuangan)
-- `Bearer demo-sales`    -> Login sebagai Sales
-- `Bearer demo-gudang`   -> Login sebagai Gudang
-- `Bearer demo-kasir`    -> Login sebagai Kasir (Finance)
-- `Bearer demo-accounting` -> Login sebagai Accounting
-- `Bearer demo-stakeholder` -> Login sebagai Stakeholder (Investor/Komisaris)
+### 1.2 OAuth 2.0 / OpenID Connect (Keycloak)
+Token demo `demo-*` **telah dihapus**. `<TOKEN>` adalah access token JWT dari
+Keycloak realm `dhana-putra` (audience `dhana-putra-api`, role di
+`resource_access.dhana-putra-api.roles`). Frontend memperolehnya lewat
+Authorization Code Flow + PKCE; lihat [docs/oauth2-keycloak-setup.md](docs/oauth2-keycloak-setup.md)
+untuk setup, matriks akses per endpoint, dan migrasi pengguna.
+Respons: `401` token tidak valid/kedaluwarsa, `403` peran tidak berhak / tanpa peran.
+`GET /api/core/me/` mengembalikan profil & peran pengguna aktif.
 
-### 1.3 Kredensial Akun Bawaan (Database PostgreSQL)
+### 1.3 Akun Bawaan (Database PostgreSQL)
+> Password lokal di bawah **tidak** dipakai untuk API (hanya Django Admin). Login aplikasi melalui Keycloak; akun dengan username sama ditautkan otomatis saat login OIDC pertama.
+
 | Username | Password | Role / Group | Deskripsi Hak Akses |
 | :--- | :--- | :--- | :--- |
 | `direktur` | `Direktur123!` | **Direktur** | **SuperAdmin** (Full CRUD) + Hak eksklusif tutup/buka periode akuntansi |
@@ -199,6 +200,8 @@ Semua endpoint ini dapat diakses oleh **Accounting**, **Finance**, **Admin**, **
 - **`GET /api/finance/reports/sales-trends/?year=2026`**
 - Menyajikan data *time-series* dari Januari hingga Desember:
   `month`, `month_name`, `total_sales`, `total_volume`, `total_cogs`, `gross_profit`.
+
+Akses tren penjualan tersedia untuk Stakeholder, Direktur, dan Admin. Field `sales_mix` berisi `brand`, `package_size`, dan `revenue` per kombinasi. Nilai berasal dari total baris faktur disetujui, dibayar sebagian, atau lunas pada tahun pilihan.
 
 ### 4.4 Laporan Tahunan (*Annual Report*)
 - **`GET /api/finance/reports/annual-report/?year=2026`**

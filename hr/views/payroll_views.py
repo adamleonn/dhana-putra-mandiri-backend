@@ -3,7 +3,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
-from core.permissions import IsDirektur, IsAccounting, IsStakeholderReadOnly
+from core.permissions import DEFAULT_PERMISSIONS, MANAGEMENT, DIREKTUR_ONLY
 from hr.models import Employee, PayrollSlip
 from hr.serializers import PayrollSlipSerializer
 from hr.services.payroll_service import generate_employee_payroll, approve_payroll_slip
@@ -14,14 +14,11 @@ class PayrollSlipViewSet(viewsets.ModelViewSet):
         'employee', 'accrual_journal_entry', 'payment', 'approved_by', 'paid_by'
     )
     serializer_class = PayrollSlipSerializer
-    permission_classes = [permissions.IsAuthenticated, IsStakeholderReadOnly]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': MANAGEMENT, 'write': DIREKTUR_ONLY, 'generate': DIREKTUR_ONLY, 'generate_monthly': DIREKTUR_ONLY, 'approve': DIREKTUR_ONLY}
     filterset_fields = ['status', 'period_month', 'period_year', 'employee']
     search_fields = ['slip_number', 'employee__full_name', 'employee__employee_id']
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsAccounting() | IsDirektur())]
-        return super().get_permissions()
 
     @action(detail=False, methods=['post'], url_path='generate_monthly')
     def generate_monthly(self, request):
@@ -89,7 +86,7 @@ class PayrollSlipViewSet(viewsets.ModelViewSet):
         except ValidationError as ve:
             return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated, IsDirektur])
+    @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         slip = self.get_object()
         try:

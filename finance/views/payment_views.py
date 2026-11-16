@@ -2,7 +2,7 @@ from decimal import Decimal
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
-from core.permissions import IsFinance, IsAdminOps, IsDirektur, IsStakeholderReadOnly
+from core.permissions import DEFAULT_PERMISSIONS, MANAGEMENT, DIREKTUR_ADMIN
 from finance.models import Payment, SalesInvoice, ChartOfAccounts
 from inventory.models import GoodsReceipt
 from finance.serializers import PaymentSerializer
@@ -24,14 +24,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
         'created_by'
     )
     serializer_class = PaymentSerializer
-    permission_classes = [permissions.IsAuthenticated, IsStakeholderReadOnly]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': MANAGEMENT, 'write': DIREKTUR_ADMIN}
     filterset_fields = ['status', 'category', 'direction', 'payment_method', 'payment_date']
     search_fields = ['payment_number', 'reference_number', 'notes']
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsFinance() | IsAdminOps() | IsDirektur())]
-        return super().get_permissions()
 
     def create(self, request, *args, **kwargs):
         category = request.data.get('category')

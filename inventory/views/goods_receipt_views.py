@@ -2,7 +2,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
-from core.permissions import IsGudang, IsDirektur, IsAdminOps, IsAccounting, IsStakeholderReadOnly
+from core.permissions import DEFAULT_PERMISSIONS, READ_ALL, DIREKTUR_ADMIN, DIREKTUR, GUDANG
 from inventory.models import GoodsReceipt
 from inventory.serializers import GoodsReceiptSerializer
 from inventory.services.hpp_service import confirm_goods_receipt
@@ -13,16 +13,11 @@ class GoodsReceiptViewSet(viewsets.ModelViewSet):
         'supplier', 'purchase_order', 'created_by', 'received_by', 'confirmed_by'
     ).prefetch_related('items__product')
     serializer_class = GoodsReceiptSerializer
-    permission_classes = [permissions.IsAuthenticated, IsStakeholderReadOnly]
+    permission_classes = DEFAULT_PERMISSIONS
+    role_access = {'read': READ_ALL, 'write': DIREKTUR_ADMIN, 'confirm': {DIREKTUR, GUDANG}}
     filterset_fields = ['status', 'payment_status', 'supplier', 'receipt_date']
     search_fields = ['receipt_number', 'supplier__name']
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return [permissions.IsAuthenticated(), (IsAdminOps() | IsAccounting() | IsDirektur())]
-        if self.action == 'confirm':
-            return [permissions.IsAuthenticated(), (IsGudang() | IsDirektur())]
-        return super().get_permissions()
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):

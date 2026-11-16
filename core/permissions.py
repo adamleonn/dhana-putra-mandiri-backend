@@ -1,91 +1,59 @@
+"""
+Kontrol akses berbasis peran (RBAC) untuk seluruh endpoint API.
+
+Setiap ViewSet mendeklarasikan `role_access`, contoh:
+
+    role_access = {
+        'read':  ALL_ROLES,              # GET/HEAD/OPTIONS
+        'write': {DIREKTUR, ADMIN},      # POST/PUT/PATCH/DELETE
+        'confirm': {DIREKTUR, GUDANG},   # override per action
+    }
+
+Prinsip:
+- Deny-by-default: view tanpa `role_access` ditolak.
+- User tanpa satu pun dari empat peran aplikasi selalu ditolak (403).
+- Peran berasal dari klaim token IdP (disinkronkan ke Django Group).
+"""
+
 from rest_framework import permissions
 
+from core.roles import ADMIN, ALL_ROLES, DIREKTUR, GUDANG, STAKEHOLDER, get_user_roles
 
-def user_in_group(user, group_name: str) -> bool:
-    if not user or not user.is_authenticated:
-        return False
-    if user.is_superuser:
-        return True
-    return user.groups.filter(name=group_name).exists()
+__all__ = [
+    'RoleBasedAccess', 'ALL_ROLES', 'DIREKTUR', 'ADMIN', 'GUDANG', 'STAKEHOLDER',
+    'READ_ALL', 'MANAGEMENT', 'DIREKTUR_ONLY', 'DIREKTUR_ADMIN',
+]
 
-
-def is_direktur(user) -> bool:
-    if not user or not user.is_authenticated:
-        return False
-    return user.is_superuser or user_in_group(user, 'Direktur')
+READ_ALL = ALL_ROLES
+MANAGEMENT = frozenset({DIREKTUR, ADMIN, STAKEHOLDER})  # boleh melihat nilai finansial
+DIREKTUR_ONLY = frozenset({DIREKTUR})
+DIREKTUR_ADMIN = frozenset({DIREKTUR, ADMIN})
 
 
-class IsDirektur(permissions.BasePermission):
-    """
-    Super-role: Full CRUD access. Only role authorized to close/reopen accounting periods.
-    """
+class RoleBasedAccess(permissions.BasePermission):
+    message = 'Peran Anda tidak memiliki akses ke sumber daya ini.'
+
     def has_permission(self, request, view):
-        return is_direktur(request.user)
-
-
-class IsAdminOps(permissions.BasePermission):
-    """
-    Operational Admin: Draft invoices & deliveries, cash/bank mutations, receive customer payments.
-    Forbidden from viewing HPP, profit margin, or General Ledger.
-    """
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        user = request.user
+        if not user or not user.is_authenticated:
             return False
-        return is_direktur(request.user) or user_in_group(request.user, 'Admin')
-
-
-class IsSales(permissions.BasePermission):
-    """
-    Sales team: Draft SalesInvoice & Delivery.
-    Forbidden from viewing HPP/profit/Ledger and forbidden from confirming deliveries.
-    """
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        roles = get_user_roles(user)
+        if not roles:
+            self.message = 'Akun Anda belum memiliki peran aplikasi. Hubungi administrator.'
             return False
-        return is_direktur(request.user) or user_in_group(request.user, 'Sales') or user_in_group(request.user, 'Admin')
 
-
-class IsGudang(permissions.BasePermission):
-    """
-    Warehouse staff: Confirm GoodsReceipt and Delivery.
-    All monetary fields are strictly stripped from responses.
-    """
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        policy = getattr(view, 'role_access', None)
+        if not policy:
             return False
-        return is_direktur(request.user) or user_in_group(request.user, 'Gudang')
+
+        action = getattr(view, 'action', None)
+        if action and action in policy:
+            allowed = policy[action]
+        elif request.method in permissions.SAFE_METHODS:
+            allowed = policy.get('read', ())
+        else:
+            allowed = policy.get('write', ())
+        return bool(roles & set(allowed))
 
 
-class IsFinance(permissions.BasePermission):
-    """
-    Finance / Kasir: Cash & bank mutations, AR/AP payments.
-    Forbidden from altering physical inventory or creating deliveries.
-    """
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        return is_direktur(request.user) or user_in_group(request.user, 'Finance') or user_in_group(request.user, 'Admin')
-
-
-class IsAccounting(permissions.BasePermission):
-    """
-    Accounting staff: Validates/posts journals, computes HPP, issues DebitNote,
-    revises SalesInvoices for shortages, submits period close.
-    """
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        return is_direktur(request.user) or user_in_group(request.user, 'Accounting')
-
-
-class IsStakeholderReadOnly(permissions.BasePermission):
-    """
-    Executive Stakeholder: Strictly read-only access to analytical reports and dashboards.
-    """
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        if user_in_group(request.user, 'Stakeholder'):
-            return request.method in permissions.SAFE_METHODS
-        return True
-
+DEFAULT_PERMISSIONS = [permissions.IsAuthenticated, RoleBasedAccess]

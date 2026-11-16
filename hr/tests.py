@@ -36,7 +36,7 @@ class HRBusinessLogicTests(TestCase):
         )
 
         self.direktur_group = Group.objects.create(name='Direktur')
-        self.sales_group = Group.objects.create(name='Sales')
+        self.sales_group = Group.objects.create(name='Admin')  # peran Sales dipensiunkan -> Admin
 
         self.direktur = User.objects.create_user(username='dir_hr', password='password123')
         self.direktur.groups.add(self.direktur_group)

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from core.mixins import RoleFilteredSerializerMixin
+from core.roles import is_direktur
 from hr.models import Employee, PayrollSlip, EmployeeMutation, LaborRecord
 
 
@@ -96,9 +97,7 @@ class EmployeeSerializer(RoleFilteredSerializerMixin, serializers.ModelSerialize
         if not request or not request.user.is_authenticated:
             return ret
 
-        user = request.user
-        is_direktur = user.is_superuser or user.groups.filter(name='Direktur').exists()
-        if not is_direktur:
+        if not is_direktur(request.user):
             # Mask sensitive HR and bank fields
             ret.pop('base_salary', None)
             ret.pop('standard_allowance', None)
