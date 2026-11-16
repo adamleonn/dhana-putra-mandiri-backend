@@ -1,8 +1,21 @@
 from decimal import Decimal
 from typing import Dict, Any, List
-from django.db.models import Sum
+from django.db.models import F, Sum
 from django.utils import timezone
 from finance.models import SalesInvoice, SalesInvoiceItem
+
+
+SALES_STATUSES = ('approved', 'partially_paid', 'paid')
+
+
+def sales_by_brand_and_size(year):
+    return list(
+        SalesInvoiceItem.objects.filter(invoice__invoice_date__year=year, invoice__status__in=SALES_STATUSES)
+        .values(brand=F('product__brand'), package_size=F('product__package_size'))
+        .annotate(revenue=Sum('line_total'))
+        .filter(revenue__gt=0)
+        .order_by('brand', 'package_size')
+    )
 
 
 def generate_product_sales_report(year=None) -> Dict[str, Any]:
@@ -11,7 +24,7 @@ def generate_product_sales_report(year=None) -> Dict[str, Any]:
 
     items = SalesInvoiceItem.objects.filter(
         invoice__invoice_date__year=year,
-        invoice__status__in=['approved', 'partially_paid', 'paid']
+        invoice__status__in=SALES_STATUSES
     ).select_related('product')
 
     product_stats = {}
@@ -78,7 +91,7 @@ def generate_sales_trends(year=None) -> List[Dict[str, Any]]:
         invoices = SalesInvoice.objects.filter(
             invoice_date__year=year,
             invoice_date__month=m,
-            status__in=['approved', 'partially_paid', 'paid']
+            status__in=SALES_STATUSES
         )
         total_sales = invoices.aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
 

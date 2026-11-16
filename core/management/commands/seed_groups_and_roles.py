@@ -25,15 +25,6 @@ class Command(BaseCommand):
                     'view_product', 'view_goodsreceipt', 'add_goodsreceipt',
                 ]
             },
-            'Sales': {
-                'description': 'Sales team: Draft invoices, deliveries, and discounts. Restricted from viewing HPP or General Ledger.',
-                'perms': [
-                    'view_customer', 'add_customer', 'change_customer',
-                    'view_product',
-                    'add_salesinvoice', 'change_salesinvoice', 'view_salesinvoice',
-                    'add_delivery', 'change_delivery', 'view_delivery',
-                ]
-            },
             'Gudang': {
                 'description': 'Warehouse team: Confirm GoodsReceipt and Delivery. Monetary values strictly stripped.',
                 'perms': [
@@ -42,28 +33,6 @@ class Command(BaseCommand):
                     'view_delivery', 'change_delivery',
                     'add_laborrecord', 'view_laborrecord',
                     'view_stockmovement',
-                ]
-            },
-            'Finance': {
-                'description': 'Kasir / Keuangan: Cash and bank mutations, AR/AP payments. No access to alter physical stock.',
-                'perms': [
-                    'view_customer', 'view_supplier',
-                    'view_salesinvoice', 'view_goodsreceipt',
-                    'add_payment', 'change_payment', 'view_payment',
-                    'view_chartofaccounts', 'view_payrollslip',
-                ]
-            },
-            'Accounting': {
-                'description': 'Accounting team: General Ledger audit, Debit Notes, revise invoices, submit period close.',
-                'perms': [
-                    'view_customer', 'view_supplier', 'view_product',
-                    'view_goodsreceipt', 'view_delivery',
-                    'view_salesinvoice', 'change_salesinvoice',
-                    'add_debitnote', 'change_debitnote', 'view_debitnote',
-                    'view_chartofaccounts', 'add_chartofaccounts', 'change_chartofaccounts',
-                    'view_generalledger', 'add_generalledger',
-                    'view_accountingperiod', 'change_accountingperiod',
-                    'view_payrollslip', 'add_payrollslip', 'change_payrollslip',
                 ]
             },
             'Stakeholder': {

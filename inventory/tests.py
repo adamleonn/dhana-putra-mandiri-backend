@@ -5,6 +5,7 @@ from django.test import TransactionTestCase, TestCase
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
+from rest_framework.test import APIClient
 from core.models import Customer, Supplier
 from finance.models import ChartOfAccounts, AccountingPeriod, SalesInvoice, SalesInvoiceItem
 from inventory.models import Product, GoodsReceipt, GoodsReceiptItem, Delivery, DeliveryItem, StockMovement
@@ -49,6 +50,31 @@ class InventoryBusinessLogicTests(TestCase):
             moving_average_hpp=Decimal('0.00'),
             selling_price=Decimal('220000.00')
         )
+
+    def test_create_receipt_with_items_through_api(self):
+        client = APIClient()
+        client.force_authenticate(self.user_sales)
+        url = '/api/inventory/goods-receipts/'
+        item = {'product': self.product.pk, 'qty_ordered': '0.00', 'qty_actual': '3.00', 'purchase_price': '250.00'}
+        payload = {'supplier': self.supplier.pk, 'receipt_date': self.today.isoformat(), 'items': [item]}
+        self.assertEqual(client.post(url, payload, format='json').status_code, 403)
+
+        admin = User.objects.create_user(username='receipt_admin')
+        admin.groups.add(Group.objects.create(name='Admin'))
+        client.force_authenticate(admin)
+        duplicate = client.post(url, {**payload, 'items': [item, item]}, format='json')
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertFalse(GoodsReceipt.objects.exists())
+
+        created = client.post(url, payload, format='json')
+        self.assertEqual(created.status_code, 201, created.data)
+        receipt = GoodsReceipt.objects.get(pk=created.data['id'])
+        self.assertEqual(receipt.status, 'draft')
+        saved_item = receipt.items.get()
+        self.assertEqual(saved_item.product_id, self.product.pk)
+        self.assertEqual(saved_item.qty_ordered, 0)
+        self.assertEqual(saved_item.qty_actual, 3)
+        self.assertEqual(saved_item.purchase_price, 250)
 
     def test_moving_average_with_transport_allocation(self):
         """

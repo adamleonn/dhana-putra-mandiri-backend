@@ -263,13 +263,13 @@
           ]
         },
         {
-          "name": "Create Draft Sales Invoice (Sales)",
+          "name": "Create Draft Sales Invoice (Admin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{token_sales}}"
+                "value": "Bearer {{token_admin}}"
               },
               {
                 "key": "Content-Type",
@@ -278,7 +278,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"invoice_date\": \"2026-11-10\",\n  \"payment_term_days\": 30,\n  \"payment_method\": \"credit\",\n  \"notes\": \"Draf pesanan invoice oleh Sales\",\n  \"items\": [\n    {\n      \"product\": \"{{product_id}}\",\n      \"qty_ordered\": \"20.00\",\n      \"unit_price\": \"200000.00\",\n      \"discount_amount\": \"0.00\"\n    }\n  ]\n}"
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"invoice_date\": \"2026-11-10\",\n  \"payment_term_days\": 30,\n  \"payment_method\": \"credit\",\n  \"notes\": \"Draf pesanan invoice oleh Admin\",\n  \"items\": [\n    {\n      \"product\": \"{{product_id}}\",\n      \"qty_ordered\": \"20.00\",\n      \"unit_price\": \"200000.00\",\n      \"discount_amount\": \"0.00\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/finance/sales-invoices/",
@@ -450,13 +450,13 @@
           ]
         },
         {
-          "name": "Create Customer Payment (Kasir)",
+          "name": "Create Customer Payment (Admin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{token_kasir}}"
+                "value": "Bearer {{token_admin}}"
               },
               {
                 "key": "Content-Type",
@@ -490,13 +490,13 @@
           ]
         },
         {
-          "name": "General Ledger Records (Accounting)",
+          "name": "General Ledger Records (Direktur)",
           "request": {
             "method": "GET",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{token_accounting}}"
+                "value": "Bearer {{token_direktur}}"
               }
             ],
             "url": {
@@ -885,13 +885,13 @@
           ]
         },
         {
-          "name": "Sales Attempt Delivery Confirmation (Should be 403 Forbidden)",
+          "name": "Admin Attempt Delivery Confirmation (Should be 403 Forbidden)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{token_sales}}"
+                "value": "Bearer {{token_admin}}"
               }
             ],
             "url": {
@@ -905,7 +905,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Sales forbidden from confirming delivery (403)', function () { pm.response.to.have.status(403); });"
+                  "pm.test('Admin forbidden from confirming delivery (403)', function () { pm.response.to.have.status(403); });"
                 ],
                 "type": "text/javascript"
               }
@@ -913,13 +913,13 @@
           ]
         },
         {
-          "name": "Accounting Attempt Period Close (Should be 403 Forbidden)",
+          "name": "Admin Attempt Period Close (Should be 403 Forbidden)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{token_accounting}}"
+                "value": "Bearer {{token_admin}}"
               }
             ],
             "url": {
@@ -933,7 +933,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Accounting forbidden from closing period (403)', function () { pm.response.to.have.status(403); });"
+                  "pm.test('Admin forbidden from closing period (403)', function () { pm.response.to.have.status(403); });"
                 ],
                 "type": "text/javascript"
               }

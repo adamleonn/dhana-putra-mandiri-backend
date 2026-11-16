@@ -34,36 +34,38 @@ class Command(BaseCommand):
         users_info = [
             ('direktur', 'Direktur123!', 'Direktur', 'Hendra', 'Wijaya', 'hendra@dhanaputra.co.id', 'manajemen', 'Direktur Utama', Decimal('15000000.00'), Decimal('3000000.00')),
             ('admin', 'Admin123!', 'Admin', 'Dewi', 'Lestari', 'dewi.admin@dhanaputra.co.id', 'operasional', 'Admin Operasional', Decimal('5500000.00'), Decimal('1200000.00')),
-            ('sales', 'Sales123!', 'Sales', 'Siti', 'Nurhaliza', 'siti.sales@dhanaputra.co.id', 'sales', 'Sales Executive', Decimal('4500000.00'), Decimal('1500000.00')),
+            ('sales', None, None, 'Siti', 'Nurhaliza', 'siti.sales@dhanaputra.co.id', 'sales', 'Sales Executive', Decimal('4500000.00'), Decimal('1500000.00')),
             ('gudang', 'Gudang123!', 'Gudang', 'Budi', 'Santoso', 'budi.gudang@dhanaputra.co.id', 'gudang', 'Kepala Gudang', Decimal('5000000.00'), Decimal('1000000.00')),
-            ('kasir', 'Kasir123!', 'Finance', 'Rita', 'Kurnia', 'rita.kasir@dhanaputra.co.id', 'finance', 'Staf Kasir & Keuangan', Decimal('4800000.00'), Decimal('800000.00')),
-            ('accounting', 'Accounting123!', 'Accounting', 'Arif', 'Wicaksono', 'arif.accounting@dhanaputra.co.id', 'accounting', 'Accounting Staff', Decimal('7500000.00'), Decimal('1500000.00')),
+            ('kasir', None, None, 'Rita', 'Kurnia', 'rita.kasir@dhanaputra.co.id', 'finance', 'Staf Kasir & Keuangan', Decimal('4800000.00'), Decimal('800000.00')),
+            ('accounting', None, None, 'Arif', 'Wicaksono', 'arif.accounting@dhanaputra.co.id', 'accounting', 'Accounting Staff', Decimal('7500000.00'), Decimal('1500000.00')),
             ('stakeholder', 'Stakeholder123!', 'Stakeholder', 'Bambang', 'Soepomo', 'bambang.investor@dhanaputra.co.id', 'manajemen', 'Komisaris', Decimal('0.00'), Decimal('0.00')),
         ]
 
         created_users = {}
         for username, pwd, group_name, first, last, email, dept, pos, salary, allowance in users_info:
-            group, _ = Group.objects.get_or_create(name=group_name)
-            user, created = User.objects.get_or_create(
-                username=username,
-                defaults={
-                    'first_name': first,
-                    'last_name': last,
-                    'email': email,
-                    'is_staff': True,
-                    'is_superuser': (username == 'direktur')
-                }
-            )
-            user.set_password(pwd)
-            user.save()
-            user.groups.add(group)
-            created_users[username] = user
+            user = None
+            if group_name:
+                group, _ = Group.objects.get_or_create(name=group_name)
+                user, created = User.objects.get_or_create(
+                    username=username,
+                    defaults={
+                        'first_name': first,
+                        'last_name': last,
+                        'email': email,
+                        'is_staff': True,
+                        'is_superuser': (username == 'direktur')
+                    }
+                )
+                user.set_password(pwd)
+                user.save()
+                user.groups.add(group)
+                created_users[username] = user
 
             emp_id = f"EMP-{username.upper()}"
             Employee.objects.update_or_create(
                 employee_id=emp_id,
                 defaults={
-                    'user': user,
+                    **({'user': user} if user else {}),
                     'full_name': f"{first} {last}",
                     'email': email,
                     'phone': '0812-3456-7890',
@@ -222,7 +224,7 @@ class Command(BaseCommand):
             discount_amount=Decimal('0.00'),
             total_amount=Decimal('19300000.00'),
             status='draft',
-            created_by=created_users['sales']
+            created_by=created_users['admin']
         )
         inv_item_1 = SalesInvoiceItem.objects.create(
             invoice=inv,
@@ -248,7 +250,7 @@ class Command(BaseCommand):
             delivery_date=today,
             driver_name='Joko Susanto',
             vehicle_number='B 9234 KDA',
-            created_by=created_users['sales'],
+            created_by=created_users['admin'],
             notes='Pengiriman toko grosir pasar induk'
         )
         DeliveryItem.objects.create(
@@ -288,7 +290,7 @@ class Command(BaseCommand):
             cash_bank_account=bank_bca,
             payment_date=today,
             payment_method='bank_transfer',
-            actor=created_users['kasir'],
+            actor=created_users['admin'],
             notes='Transfer gaji Budi Santoso (Gudang)'
         )
 

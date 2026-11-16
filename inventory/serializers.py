@@ -1,4 +1,5 @@
 from decimal import Decimal
+from django.db import transaction
 from rest_framework import serializers
 from core.mixins import RoleFilteredSerializerMixin
 from core.services.sequence import next_number
@@ -121,6 +122,7 @@ class GoodsReceiptItemSerializer(RoleFilteredSerializerMixin, serializers.ModelS
 
     class Meta:
         model = GoodsReceiptItem
+        extra_kwargs = {'qty_ordered': {'required': False}}
         fields = [
             'id',
             'product',
@@ -195,6 +197,13 @@ class GoodsReceiptSerializer(RoleFilteredSerializerMixin, serializers.ModelSeria
             'updated_at'
         ]
 
+    def validate_items(self, items):
+        products = [item['product'].pk for item in items if 'product' in item]
+        if len(products) != len(set(products)):
+            raise serializers.ValidationError('Produk yang sama hanya boleh muncul satu kali per penerimaan.')
+        return items
+
+    @transaction.atomic
     def create(self, validated_data):
         receipt_date = validated_data.get('receipt_date')
         validated_data['receipt_number'] = next_number('GR', receipt_date)
@@ -204,27 +213,15 @@ class GoodsReceiptSerializer(RoleFilteredSerializerMixin, serializers.ModelSeria
             validated_data['created_by'] = request.user
             validated_data['received_by'] = request.user
 
-        items_data = self.context.get('request').data.get('items', [])
+        items_data = validated_data.pop('items', [])
         po = validated_data.get('purchase_order')
 
         receipt = GoodsReceipt.objects.create(**validated_data)
         for item_data in items_data:
-            product = Product.objects.get(pk=item_data['product'])
-            qty_ordered = item_data.get('qty_ordered')
-            if po and not qty_ordered:
-                po_item = po.items.filter(product=product).first()
-                qty_ordered = po_item.qty_ordered if po_item else item_data['qty_actual']
-            elif not qty_ordered:
-                qty_ordered = item_data['qty_actual']
-
-            GoodsReceiptItem.objects.create(
-                goods_receipt=receipt,
-                product=product,
-                qty_ordered=Decimal(str(qty_ordered)),
-                qty_actual=Decimal(str(item_data['qty_actual'])),
-                purchase_price=Decimal(str(item_data.get('purchase_price', '0.00'))),
-                notes=item_data.get('notes', '')
-            )
+            if 'qty_ordered' not in item_data:
+                po_item = po.items.filter(product=item_data['product']).first() if po else None
+                item_data['qty_ordered'] = po_item.qty_ordered if po_item else item_data['qty_actual']
+            GoodsReceiptItem.objects.create(goods_receipt=receipt, **item_data)
         return receipt
 
 
