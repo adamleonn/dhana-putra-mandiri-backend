@@ -62,3 +62,15 @@ htmlcov/
 
 # Local virtualenvs
 .venv*/
+
+# Static collect output
+staticfiles/
+
+# Private keys / certificates
+*.pem
+*.key
+*.p12
+
+# Keycloak user export (personal data) & local realm exports
+keycloak/users-import.json
+keycloak/*-export*.json
