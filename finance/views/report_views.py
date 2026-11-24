@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from django.utils import timezone
 from core.permissions import DEFAULT_PERMISSIONS, MANAGEMENT
 from finance.reports.sales_reports import sales_by_brand_and_size
@@ -11,6 +12,12 @@ from finance.reports import (
     generate_annual_report,
     generate_pie_chart_analytics
 )
+from finance.services.report_summary_service import REPORT_BUILDERS, SummaryError, generate_report_summary
+
+
+class AISummaryThrottle(UserRateThrottle):
+    """Batas panggilan ringkasan AI per pengguna (THROTTLE_AI_SUMMARY)."""
+    scope = 'ai_summary'
 
 
 class FinancialReportsViewSet(viewsets.ViewSet):
@@ -66,3 +73,40 @@ class FinancialReportsViewSet(viewsets.ViewSet):
         analytics = generate_pie_chart_analytics()
         return Response(analytics, status=status.HTTP_200_OK)
 
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='summary',
+        throttle_classes=[AISummaryThrottle],
+    )
+    def summary(self, request):
+        """
+        Ringkasan AI (SLM) untuk laporan yang sedang dibuka.
+        Query: report=<sales-trends|product-sales|annual|balance-sheet|pie-charts>,
+        year=YYYY (laporan tahunan) atau as_of_date=YYYY-MM-DD (neraca).
+        """
+        report = request.query_params.get('report', '')
+        if report not in REPORT_BUILDERS:
+            return Response(
+                {'error': f"Parameter 'report' wajib salah satu dari: {', '.join(REPORT_BUILDERS)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        params = {}
+        if report == 'balance-sheet':
+            as_of = request.query_params.get('as_of_date')
+            try:
+                params['as_of_date'] = (
+                    timezone.datetime.strptime(as_of, '%Y-%m-%d').date() if as_of else timezone.localdate()
+                )
+            except ValueError:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        elif report != 'pie-charts':
+            year = request.query_params.get('year')
+            params['year'] = int(year) if year and year.isdigit() else timezone.now().year
+
+        try:
+            result = generate_report_summary(report, params)
+        except SummaryError as exc:
+            return Response({'error': exc.message}, status=exc.status_code)
+        return Response(result, status=status.HTTP_200_OK)

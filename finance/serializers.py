@@ -164,12 +164,14 @@ class SalesInvoiceSerializer(RoleFilteredSerializerMixin, serializers.ModelSeria
     customer_code = serializers.CharField(source='customer.code', read_only=True)
     customer_name = serializers.CharField(source='customer.name', read_only=True)
     remaining_due = serializers.ReadOnlyField()
+    delivery = serializers.SerializerMethodField()
 
     class Meta:
         model = SalesInvoice
         fields = [
             'id',
             'invoice_number',
+            'delivery',
             'customer',
             'customer_code',
             'customer_name',
@@ -201,6 +203,11 @@ class SalesInvoiceSerializer(RoleFilteredSerializerMixin, serializers.ModelSeria
             'created_at',
             'updated_at'
         ]
+
+    def get_delivery(self, obj):
+        """ID Surat Jalan yang sudah terikat (1:1), atau None bila belum dikirim."""
+        delivery = getattr(obj, 'delivery', None)
+        return delivery.pk if delivery else None
 
     def create(self, validated_data):
         invoice_date = validated_data.get('invoice_date')

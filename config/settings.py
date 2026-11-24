@@ -179,6 +179,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': os.getenv('THROTTLE_ANON', '100/min'),
         'user': os.getenv('THROTTLE_USER', '1000/min'),
+        'ai_summary': os.getenv('THROTTLE_AI_SUMMARY', '10/min'),
     }
 }
 
@@ -271,3 +272,15 @@ if APP_ENV == 'production':
         raise ImproperlyConfigured("OIDC_ISSUER wajib diset dan memakai HTTPS pada production!")
     if not OIDC_ALLOWED_CLIENT_IDS:
         raise ImproperlyConfigured("OIDC_ALLOWED_CLIENT_IDS wajib diset pada production!")
+
+# -----------------------------------------------------------------------------
+# Asisten ringkasan laporan (Small Language Model, API kompatibel OpenAI)
+# Default: Ollama lokal (http://localhost:11434/v1) tanpa API key.
+# API key HANYA dari environment/.env, jangan ditulis di kode.
+# -----------------------------------------------------------------------------
+AI_SUMMARY_ENABLED = env_bool('AI_SUMMARY_ENABLED', True)
+AI_SUMMARY_BASE_URL = os.getenv('AI_SUMMARY_BASE_URL', 'http://localhost:11434/v1')
+AI_SUMMARY_MODEL = os.getenv('AI_SUMMARY_MODEL', 'qwen2.5:1.5b')
+AI_SUMMARY_API_KEY = os.getenv('AI_SUMMARY_API_KEY', '')
+AI_SUMMARY_TIMEOUT_SECONDS = int(os.getenv('AI_SUMMARY_TIMEOUT_SECONDS', '120'))
+AI_SUMMARY_MAX_TOKENS = int(os.getenv('AI_SUMMARY_MAX_TOKENS', '500'))

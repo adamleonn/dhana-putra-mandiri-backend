@@ -232,3 +232,77 @@ class DatabaseTriggerBalanceTests(TransactionTestCase):
                     ledger_entry=ledger, account=acc_sales, debit=Decimal('0.00'), credit=Decimal('700.00')  # 300 discrepancy!
                 )
         self.assertIn("Database Constraint Violation", str(ctx.exception))
+
+
+# ---------------------------------------------------------------------------
+# Asisten ringkasan laporan (SLM) — model & data di-mock, tanpa DB/Ollama.
+# ---------------------------------------------------------------------------
+from unittest import mock
+from django.test import SimpleTestCase, override_settings
+from finance.services import report_summary_service as summary_svc
+
+
+def _facts_with_sales():
+    data = summary_svc.ReportFacts(title='Uji', period='Tahun 2026')
+    data.add('ringkasan', 'Total penjualan tahun 2026: Rp 1.500.000.')
+    data.add('masalah', 'Laba kotor negatif pada bulan: Maret.')
+    return data
+
+
+@override_settings(AI_SUMMARY_ENABLED=True, AI_SUMMARY_MODEL='uji-model')
+class ReportSummaryServiceTests(SimpleTestCase):
+    def _patch_builder(self, data):
+        return mock.patch.dict(summary_svc.REPORT_BUILDERS, {'annual': lambda params: data})
+
+    def test_insufficient_data_skips_model(self):
+        empty = summary_svc.ReportFacts(title='Uji', period='Tahun 2026')
+        with self._patch_builder(empty), mock.patch.object(summary_svc, '_call_model') as call:
+            result = summary_svc.generate_report_summary('annual', {'year': 2026})
+        call.assert_not_called()
+        self.assertEqual(result['status'], 'insufficient')
+        self.assertIn('belum dapat dibuat', result['message'])
+
+    def test_summary_ok_uses_only_facts(self):
+        output = 'RINGKASAN:\n- Penjualan 2026 sebesar Rp 1.500.000.\nMASALAH:\n- Laba kotor negatif pada Maret.'
+        with self._patch_builder(_facts_with_sales()), mock.patch.object(summary_svc, '_call_model', return_value=output) as call:
+            result = summary_svc.generate_report_summary('annual', {'year': 2026})
+        self.assertEqual(result['status'], 'ok')
+        self.assertIn('Rp 1.500.000', result['summary'])
+        self.assertIn('MASALAH:\n- Laba kotor negatif', call.call_args[0][1])
+
+    def test_missing_section_filled_from_facts_without_duplicates(self):
+        # Model menaruh semua poin tanpa judul bagian.
+        output = '- Total penjualan tahun 2026: Rp 1.500.000.\n- Laba kotor negatif pada bulan: Maret.'
+        with self._patch_builder(_facts_with_sales()), mock.patch.object(summary_svc, '_call_model', return_value=output):
+            result = summary_svc.generate_report_summary('annual', {'year': 2026})
+        self.assertEqual(
+            result['summary'],
+            'RINGKASAN:\n- Total penjualan tahun 2026: Rp 1.500.000.\nMASALAH:\n- Laba kotor negatif pada bulan: Maret.',
+        )
+
+    def test_rejects_amount_not_in_report(self):
+        output = 'RINGKASAN:\n- Penjualan mencapai Rp 9.999.999.'
+        with self._patch_builder(_facts_with_sales()), mock.patch.object(summary_svc, '_call_model', return_value=output):
+            with self.assertRaises(summary_svc.SummaryError):
+                summary_svc.generate_report_summary('annual', {'year': 2026})
+
+    def test_model_marker_insufficient(self):
+        with self._patch_builder(_facts_with_sales()), mock.patch.object(summary_svc, '_call_model', return_value='DATA_TIDAK_CUKUP'):
+            result = summary_svc.generate_report_summary('annual', {'year': 2026})
+        self.assertEqual(result['status'], 'insufficient')
+
+    @override_settings(AI_SUMMARY_ENABLED=False)
+    def test_disabled_returns_503(self):
+        with self._patch_builder(_facts_with_sales()):
+            with self.assertRaises(summary_svc.SummaryError) as ctx:
+                summary_svc.generate_report_summary('annual', {'year': 2026})
+        self.assertEqual(ctx.exception.status_code, 503)
+
+    def test_unknown_report(self):
+        with self.assertRaises(summary_svc.SummaryError) as ctx:
+            summary_svc.generate_report_summary('tidak-ada', {})
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_rupiah_format(self):
+        self.assertEqual(summary_svc.rupiah(Decimal('1234567.4')), 'Rp 1.234.567')
+        self.assertEqual(summary_svc.rupiah(Decimal('-5000')), '-Rp 5.000')
